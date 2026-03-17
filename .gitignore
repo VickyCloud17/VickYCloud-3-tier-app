@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────────
+#  VickYCloud — .gitignore
+# ─────────────────────────────────────────────────────────────────
+
+# ── Terraform ─────────────────────────────────────────────────────
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars          # contains passwords — never commit
+terraform/tfplan
+*.tfvars
+*.tfstate
+*.tfstate.*
+
+# ── GitHub Actions secrets (never commit) ─────────────────────────
+.env
+.env.*
+secrets/
+*.secret
+
+# ── Docker ────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── Kubernetes ────────────────────────────────────────────────────
+kubeconfig
+*.kubeconfig
+k8s/secrets/
+
+# ── Logs ──────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp

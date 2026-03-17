@@ -1,0 +1,30 @@
+# ─────────────────────────────────────────────────────────────────
+#  VickYCloud — Web Tier Service
+#  File: web-service.yml
+#  Type: LoadBalancer  (public-facing — receives all browser traffic)
+#        Change to NodePort if running locally with minikube/kind
+# ─────────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+  namespace: default
+  labels:
+    app: web
+    tier: presentation
+    project: vickycloud
+spec:
+  type: LoadBalancer                   # use NodePort for local clusters
+  selector:
+    app: web
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80                         # external port
+      targetPort: 80                   # nginx container port
+      # nodePort: 30080                # uncomment if using NodePort
+
+# ── For minikube / kind local testing ─────────────────────────
+# Change type: LoadBalancer → NodePort and run:
+#   minikube service web-service --url

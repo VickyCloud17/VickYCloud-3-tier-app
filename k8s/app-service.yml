@@ -1,0 +1,25 @@
+# ─────────────────────────────────────────────────────────────────
+#  VickYCloud — App Tier Service
+#  File: app-service.yml
+#  Type: ClusterIP  (internal only — nginx proxies to it)
+#  Name: app-service  ← must match proxy_pass in default.conf
+# ─────────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-service                    # referenced in nginx default.conf
+  namespace: default
+  labels:
+    app: app
+    tier: application
+    project: vickycloud
+spec:
+  type: ClusterIP                      # NOT exposed externally
+  selector:
+    app: app
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80                         # service port
+      targetPort: 80                   # container port

@@ -1,0 +1,59 @@
+# ─────────────────────────────────────────────────────────────────
+#  VickYCloud — DB Tier Service
+#  File: db-service.yml
+#  Type: ClusterIP  (internal only — app-tier connects by name)
+#  Name: mysql-service  ← must match DB_HOST in submit.php/login.php
+# ─────────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service                  # referenced in submit.php & login.php
+  namespace: default
+  labels:
+    app: mysql
+    tier: data
+    project: vickycloud
+spec:
+  type: ClusterIP                      # NOT exposed externally — DB stays private
+  selector:
+    app: mysql
+  ports:
+    - name: mysql
+      protocol: TCP
+      port: 3306                       # service port
+      targetPort: 3306                 # MySQL container port
+
+---
+# ─────────────────────────────────────────────────────────────────
+#  Secret — MySQL credentials
+#  Apply with:  kubectl apply -f db-service.yml
+#
+#  To generate base64 values:
+#    echo -n 'yourvalue' | base64
+#
+#  Current values (base64 encoded):
+#    root        → cm9vdA==
+#    password123 → cGFzc3dvcmQxMjM=
+#    devopsdb    → ZGV2b3BzZGI=
+# ─────────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+  namespace: default
+  labels:
+    project: vickycloud
+type: Opaque
+data:
+  mysql-root-password: cGFzc3dvcmQxMjM=   # password123
+  mysql-user:         cm9vdA==             # root
+  mysql-password:     cGFzc3dvcmQxMjM=    # password123
+
+# ── IMPORTANT ────────────────────────────────────────────────────
+# In production, replace these with strong values and use:
+#   kubectl create secret generic mysql-secret \
+#     --from-literal=mysql-root-password='YourStr0ngPass!' \
+#     --from-literal=mysql-user='devuser' \
+#     --from-literal=mysql-password='YourStr0ngPass!'

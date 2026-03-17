@@ -1,0 +1,204 @@
+# ─────────────────────────────────────────────────────────────────
+#  VickYCloud — DB Tier
+#  File: db-deployment.yml
+#  Runs: MySQL 8.0 with PersistentVolumeClaim for data durability
+#  NOTE: Apply mysql-secret.yml BEFORE this file
+# ─────────────────────────────────────────────────────────────────
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-deployment
+  namespace: default
+  labels:
+    app: mysql
+    tier: data
+    project: vickycloud
+spec:
+  replicas: 1                          # MySQL is stateful — keep at 1
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate                     # safe for stateful DB (no dual-write)
+  template:
+    metadata:
+      labels:
+        app: mysql
+        tier: data
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3306
+              name: mysql
+
+          # ── Credentials from Secret ───────────────────────
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-root-password
+            - name: MYSQL_DATABASE
+              value: "devopsdb"
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-user
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-password
+
+          # ── Persistent storage ────────────────────────────
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+            - name: mysql-initdb
+              mountPath: /docker-entrypoint-initdb.d  # auto-runs schema.sql
+
+          # ── Resource limits ───────────────────────────────
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+
+          # ── Liveness probe ────────────────────────────────
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+                - -ppassword123
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 3
+
+          # ── Readiness probe ───────────────────────────────
+          readinessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+                - -ppassword123
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+
+      volumes:
+        # PVC for MySQL data directory
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: mysql-pvc
+
+        # ConfigMap holding schema.sql
+        - name: mysql-initdb
+          configMap:
+            name: mysql-initdb-config
+
+      restartPolicy: Always
+
+---
+# ── PersistentVolumeClaim ─────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: default
+  labels:
+    project: vickycloud
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi                     # increase for production
+
+---
+# ── ConfigMap — schema.sql auto-init ─────────────────────────
+# Paste your full schema.sql content under schema.sql: |
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-initdb-config
+  namespace: default
+  labels:
+    project: vickycloud
+data:
+  schema.sql: |
+    CREATE DATABASE IF NOT EXISTS devopsdb
+        CHARACTER SET utf8mb4
+        COLLATE utf8mb4_unicode_ci;
+
+    USE devopsdb;
+
+    CREATE TABLE IF NOT EXISTS users (
+        id               INT           AUTO_INCREMENT PRIMARY KEY,
+        username         VARCHAR(80)   UNIQUE,
+        first_name       VARCHAR(100)  NOT NULL,
+        last_name        VARCHAR(100)  NOT NULL,
+        email            VARCHAR(255)  NOT NULL UNIQUE,
+        password_hash    VARCHAR(255)  NOT NULL,
+        company          VARCHAR(150),
+        role             ENUM('admin','developer','viewer') DEFAULT 'developer',
+        mfa_enabled      TINYINT(1)    DEFAULT 0,
+        mfa_secret       VARCHAR(64),
+        remember_token   VARCHAR(64),
+        login_attempts   TINYINT       DEFAULT 0,
+        locked_until     DATETIME,
+        last_login       DATETIME,
+        created_at       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+        updated_at       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS messages (
+        id               INT           AUTO_INCREMENT PRIMARY KEY,
+        user_id          INT,
+        first_name       VARCHAR(100)  NOT NULL,
+        last_name        VARCHAR(100)  NOT NULL,
+        email            VARCHAR(255)  NOT NULL,
+        company          VARCHAR(150),
+        cloud            ENUM('AWS','Google Cloud','Azure','Multi-Cloud','On-Premise / Hybrid','') DEFAULT '',
+        message          TEXT          NOT NULL,
+        status           ENUM('new','read','replied') DEFAULT 'new',
+        created_at       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_messages_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS login_logs (
+        id               INT           AUTO_INCREMENT PRIMARY KEY,
+        user_id          INT,
+        ip_address       VARCHAR(45)   NOT NULL,
+        user_agent       VARCHAR(255),
+        status           ENUM('success','failed','locked') DEFAULT 'failed',
+        created_at       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_loginlogs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS deployments (
+        id               INT           AUTO_INCREMENT PRIMARY KEY,
+        service_name     VARCHAR(150)  NOT NULL,
+        version          VARCHAR(50)   NOT NULL,
+        environment      ENUM('dev','staging','production') NOT NULL,
+        status           ENUM('pending','running','success','failed') DEFAULT 'pending',
+        deployed_by      VARCHAR(100),
+        deployed_at      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX idx_users_email      ON users      (email);
+    CREATE INDEX idx_messages_email   ON messages   (email);
+    CREATE INDEX idx_messages_status  ON messages   (status);
+    CREATE INDEX idx_loginlogs_user   ON login_logs (user_id);
+    CREATE INDEX idx_loginlogs_ip     ON login_logs (ip_address);

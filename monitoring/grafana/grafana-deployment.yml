@@ -1,0 +1,268 @@
+# ─────────────────────────────────────────────────────────────────
+#  VickYCloud — Grafana Deployment + Service + Dashboard
+#  File: monitoring/grafana/grafana-deployment.yml
+# ─────────────────────────────────────────────────────────────────
+
+---
+# ── Grafana datasource — auto-connects to Prometheus ─────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+  labels:
+    project: vickycloud
+data:
+  datasource.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-service.monitoring.svc.cluster.local:9090
+        isDefault: true
+        editable: true
+
+---
+# ── Grafana dashboard provisioning config ────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: monitoring
+  labels:
+    project: vickycloud
+data:
+  dashboard-provider.yml: |
+    apiVersion: 1
+    providers:
+      - name: vickycloud-dashboards
+        orgId: 1
+        folder: VickYCloud
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards
+
+---
+# ── VickYCloud Dashboard JSON ─────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+  labels:
+    project: vickycloud
+data:
+  vickycloud.json: |
+    {
+      "title": "VickYCloud — DevOps Platform",
+      "uid":   "vickycloud-main",
+      "tags":  ["vickycloud", "kubernetes", "devops"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "panels": [
+        {
+          "id": 1, "type": "stat", "title": "Running Pods",
+          "gridPos": {"h":4,"w":6,"x":0,"y":0},
+          "targets": [{
+            "expr": "count(kube_pod_status_phase{namespace='vickycloud',phase='Running'})",
+            "legendFormat": "Pods"
+          }],
+          "options": {"colorMode":"background"},
+          "fieldConfig": {"defaults":{"color":{"mode":"thresholds"},
+            "thresholds":{"steps":[{"color":"red","value":0},{"color":"yellow","value":1},{"color":"green","value":3}]}}}
+        },
+        {
+          "id": 2, "type": "stat", "title": "CPU Usage %",
+          "gridPos": {"h":4,"w":6,"x":6,"y":0},
+          "targets": [{
+            "expr": "round(avg(rate(container_cpu_usage_seconds_total{namespace='vickycloud',container!=''}[5m])) * 100, 0.1)",
+            "legendFormat": "CPU %"
+          }],
+          "options": {"colorMode":"background"},
+          "fieldConfig": {"defaults":{"unit":"percent","color":{"mode":"thresholds"},
+            "thresholds":{"steps":[{"color":"green","value":0},{"color":"yellow","value":60},{"color":"red","value":80}]}}}
+        },
+        {
+          "id": 3, "type": "stat", "title": "Memory Usage",
+          "gridPos": {"h":4,"w":6,"x":12,"y":0},
+          "targets": [{
+            "expr": "sum(container_memory_usage_bytes{namespace='vickycloud',container!=''})",
+            "legendFormat": "Memory"
+          }],
+          "fieldConfig": {"defaults":{"unit":"bytes"}}
+        },
+        {
+          "id": 4, "type": "stat", "title": "MySQL Up",
+          "gridPos": {"h":4,"w":6,"x":18,"y":0},
+          "targets": [{"expr": "mysql_up", "legendFormat": "MySQL"}],
+          "options": {"colorMode":"background"},
+          "fieldConfig": {"defaults":{"mappings":[{"type":"value","options":{"0":{"text":"DOWN","color":"red"},"1":{"text":"UP","color":"green"}}}]}}
+        },
+        {
+          "id": 5, "type": "timeseries", "title": "CPU Usage Over Time (all pods)",
+          "gridPos": {"h":8,"w":12,"x":0,"y":4},
+          "targets": [{
+            "expr": "rate(container_cpu_usage_seconds_total{namespace='vickycloud',container!=''}[5m]) * 100",
+            "legendFormat": "{{pod}}"
+          }],
+          "fieldConfig": {"defaults":{"unit":"percent"}}
+        },
+        {
+          "id": 6, "type": "timeseries", "title": "Memory Usage Over Time",
+          "gridPos": {"h":8,"w":12,"x":12,"y":4},
+          "targets": [{
+            "expr": "container_memory_usage_bytes{namespace='vickycloud',container!=''}",
+            "legendFormat": "{{pod}}"
+          }],
+          "fieldConfig": {"defaults":{"unit":"bytes"}}
+        },
+        {
+          "id": 7, "type": "timeseries", "title": "MySQL Queries Per Second",
+          "gridPos": {"h":8,"w":12,"x":0,"y":12},
+          "targets": [{
+            "expr": "rate(mysql_global_status_queries[5m])",
+            "legendFormat": "Queries/s"
+          }]
+        },
+        {
+          "id": 8, "type": "timeseries", "title": "MySQL Connections",
+          "gridPos": {"h":8,"w":12,"x":12,"y":12},
+          "targets": [
+            {"expr": "mysql_global_status_threads_connected", "legendFormat": "Active"},
+            {"expr": "mysql_global_variables_max_connections",  "legendFormat": "Max"}
+          ]
+        },
+        {
+          "id": 9, "type": "table", "title": "Pod Status",
+          "gridPos": {"h":8,"w":24,"x":0,"y":20},
+          "targets": [{
+            "expr": "kube_pod_status_phase{namespace='vickycloud'}",
+            "legendFormat": "{{pod}} — {{phase}}",
+            "instant": true
+          }]
+        }
+      ],
+      "schemaVersion": 38,
+      "version": 1
+    }
+
+---
+# ── Grafana Secret ────────────────────────────────────────────────
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secret
+  namespace: monitoring
+  labels:
+    project: vickycloud
+type: Opaque
+stringData:
+  admin-user:     admin
+  admin-password: Admin@Grafana1   # override via terraform.tfvars
+
+---
+# ── Grafana Deployment ────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: grafana
+    project: vickycloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.2.3
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: admin-user
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: admin-password
+            - name: GF_SERVER_ROOT_URL
+              value: "http://localhost:32000"
+            - name: GF_INSTALL_PLUGINS
+              value: "grafana-piechart-panel,grafana-clock-panel"
+            - name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH
+              value: "/var/lib/grafana/dashboards/vickycloud.json"
+          volumeMounts:
+            - name: grafana-datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: grafana-dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: grafana-dashboards
+              mountPath: /var/lib/grafana/dashboards
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: grafana-datasources
+          configMap:
+            name: grafana-datasources
+        - name: grafana-dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: grafana-dashboards
+          configMap:
+            name: grafana-dashboards
+        - name: grafana-storage
+          emptyDir: {}
+
+---
+# ── Grafana Service ───────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: monitoring
+  labels:
+    app: grafana
+    project: vickycloud
+spec:
+  type: NodePort
+  selector:
+    app: grafana
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      nodePort: 32000

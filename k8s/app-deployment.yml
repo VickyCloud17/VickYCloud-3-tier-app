@@ -1,0 +1,84 @@
+# ─────────────────────────────────────────────────────────────────
+#  VickYCloud — App Tier
+#  File: app-deployment.yml
+#  Runs: PHP 8.2 + Apache (submit.php + login.php)
+# ─────────────────────────────────────────────────────────────────
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-deployment
+  namespace: default
+  labels:
+    app: app
+    tier: application
+    project: vickycloud
+spec:
+  replicas: 2                          # 2 pods for HA
+  selector:
+    matchLabels:
+      app: app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0                # zero-downtime deploys
+  template:
+    metadata:
+      labels:
+        app: app
+        tier: application
+    spec:
+      containers:
+        - name: app
+          image: vickycloud/app-tier:latest   # replace with your image
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              name: http
+
+          # ── Environment — DB connection ───────────────────
+          env:
+            - name: DB_HOST
+              value: "mysql-service"
+            - name: DB_NAME
+              value: "devopsdb"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-user
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-password
+
+          # ── Resource limits ───────────────────────────────
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+          # ── Liveness probe ────────────────────────────────
+          livenessProbe:
+            httpGet:
+              path: /submit.php
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+
+          # ── Readiness probe ───────────────────────────────
+          readinessProbe:
+            httpGet:
+              path: /submit.php
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+
+      restartPolicy: Always

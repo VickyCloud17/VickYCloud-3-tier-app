@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VickYCloud — DevOps 3-Tier Platform</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #04060f;
+      --surface: #090d1e;
+      --card: #0e1428;
+      --border: rgba(99,179,255,0.12);
+      --accent: #3b82f6;
+      --accent2: #06b6d4;
+      --accent3: #8b5cf6;
+      --text: #e8edf8;
+      --muted: #7a8aaa;
+      --green: #10b981;
+      --orange: #f97316;
+      --glow: rgba(59,130,246,0.25);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Manrope', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── ANIMATED STARFIELD BG ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 10%, rgba(59,130,246,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(139,92,246,0.07) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(6,182,212,0.04) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    /* ── GRID OVERLAY ── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(99,179,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,179,255,0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    section, nav, footer { position: relative; z-index: 1; }
+
+    /* ── NAV ── */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 5%;
+      height: 72px;
+      background: rgba(4,6,15,0.7);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.5rem; font-weight: 800;
+      color: #fff;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo-icon {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, var(--accent), var(--accent3));
+      border-radius: 8px;
+      display: grid; place-items: center;
+      font-size: 1rem;
+    }
+    .logo span { color: var(--accent); }
+
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none;
+      font-size: 0.9rem; font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-cta {
+      padding: 9px 22px;
+      background: var(--accent);
+      color: #fff; border-radius: 8px;
+      font-size: 0.875rem; font-weight: 600;
+      text-decoration: none;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .nav-cta:hover { background: #2563eb; box-shadow: 0 0 20px var(--glow); }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 90vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center;
+      padding: 80px 5% 60px;
+    }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(59,130,246,0.1);
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 0.78rem; font-weight: 600;
+      color: var(--accent);
+      font-family: 'IBM Plex Mono', monospace;
+      margin-bottom: 28px;
+      animation: fadeDown 0.6s ease both;
+    }
+    .badge::before { content: '●'; font-size: 0.5rem; color: var(--green); animation: pulse 2s infinite; }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    @keyframes fadeDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:none} }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:none} }
+    @keyframes scaleIn { from{opacity:0;transform:scale(0.92)} to{opacity:1;transform:none} }
+
+    .hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(2.6rem, 6vw, 5rem);
+      font-weight: 800; line-height: 1.08;
+      max-width: 900px;
+      animation: fadeUp 0.7s 0.1s ease both;
+    }
+    .hero h1 .grad {
+      background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      margin-top: 20px;
+      max-width: 580px;
+      color: var(--muted); font-size: 1.1rem; line-height: 1.7;
+      animation: fadeUp 0.7s 0.2s ease both;
+    }
+
+    .hero-btns {
+      display: flex; gap: 14px; margin-top: 36px;
+      animation: fadeUp 0.7s 0.3s ease both;
+    }
+    .btn-primary {
+      padding: 14px 32px;
+      background: var(--accent);
+      color: #fff; border-radius: 10px;
+      font-weight: 700; font-size: 0.95rem;
+      text-decoration: none;
+      transition: all 0.2s;
+      box-shadow: 0 0 0 0 var(--glow);
+    }
+    .btn-primary:hover { background: #2563eb; box-shadow: 0 0 30px var(--glow); transform: translateY(-2px); }
+
+    .btn-ghost {
+      padding: 14px 32px;
+      border: 1px solid var(--border);
+      color: var(--text); border-radius: 10px;
+      font-weight: 600; font-size: 0.95rem;
+      text-decoration: none;
+      background: rgba(255,255,255,0.03);
+      transition: all 0.2s;
+    }
+    .btn-ghost:hover { border-color: var(--accent); background: rgba(59,130,246,0.06); transform: translateY(-2px); }
+
+    /* ── 3-TIER DIAGRAM ── */
+    .arch-section {
+      padding: 80px 5%;
+      text-align: center;
+    }
+    .section-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.72rem; color: var(--accent);
+      letter-spacing: 0.15em; text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800; margin-bottom: 14px;
+    }
+    .section-sub { color: var(--muted); max-width: 540px; margin: 0 auto 56px; line-height: 1.7; }
+
+    .tiers {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      max-width: 900px; margin: 0 auto;
+      position: relative;
+    }
+
+    .tiers::before {
+      content: '';
+      position: absolute; top: 50%; left: 16.66%; right: 16.66%;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
+      transform: translateY(-50%);
+      z-index: 0;
+    }
+
+    .tier-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px 24px;
+      position: relative; z-index: 1;
+      transition: transform 0.3s, box-shadow 0.3s;
+      animation: scaleIn 0.6s ease both;
+    }
+    .tier-card:hover { transform: translateY(-8px); box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 30px var(--glow); }
+
+    .tier-card:nth-child(1) { border-top: 3px solid var(--accent); }
+    .tier-card:nth-child(2) { border-top: 3px solid var(--accent2); margin: 0 -1px; }
+    .tier-card:nth-child(3) { border-top: 3px solid var(--accent3); }
+
+    .tier-icon {
+      width: 52px; height: 52px;
+      border-radius: 12px;
+      display: grid; place-items: center;
+      font-size: 1.5rem; margin: 0 auto 16px;
+    }
+    .tier-card:nth-child(1) .tier-icon { background: rgba(59,130,246,0.15); }
+    .tier-card:nth-child(2) .tier-icon { background: rgba(6,182,212,0.15); }
+    .tier-card:nth-child(3) .tier-icon { background: rgba(139,92,246,0.15); }
+
+    .tier-card h3 { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+    .tier-card p { color: var(--muted); font-size: 0.875rem; line-height: 1.6; }
+    .tier-tag {
+      display: inline-block; margin-top: 14px;
+      font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem;
+      padding: 4px 10px; border-radius: 4px;
+      background: rgba(99,179,255,0.08); color: var(--accent2);
+    }
+
+    /* ── STATS BAR ── */
+    .stats-bar {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      padding: 32px 5%;
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 20px; text-align: center;
+    }
+    .stat-val {
+      font-family: 'Syne', sans-serif; font-size: 2rem; font-weight: 800;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-lbl { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
+
+    /* ── SERVICES GRID ── */
+    .services { padding: 80px 5%; }
+    .services-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px; max-width: 1200px; margin: 0 auto;
+    }
+
+    .service-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px;
+      transition: all 0.3s; cursor: default;
+    }
+    .service-card:hover {
+      border-color: var(--accent);
+      background: rgba(59,130,246,0.05);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+    }
+
+    .svc-icon { font-size: 2rem; margin-bottom: 14px; }
+    .svc-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; margin-bottom: 8px; }
+    .svc-desc { color: var(--muted); font-size: 0.845rem; line-height: 1.65; }
+
+    .svc-tech {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px;
+    }
+    .tech-pill {
+      font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem;
+      padding: 3px 9px; border-radius: 4px;
+      background: rgba(255,255,255,0.05); color: var(--muted);
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    /* ── PIPELINE VISUAL ── */
+    .pipeline-section { padding: 80px 5%; background: var(--surface); }
+    .pipeline {
+      display: flex; align-items: center; gap: 0;
+      max-width: 960px; margin: 0 auto;
+      overflow-x: auto; padding-bottom: 10px;
+    }
+    .pipe-step {
+      flex: 1; min-width: 120px;
+      text-align: center; position: relative;
+    }
+    .pipe-step:not(:last-child)::after {
+      content: '→';
+      position: absolute; right: -12px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--accent); font-size: 1.2rem;
+      z-index: 2;
+    }
+    .pipe-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 10px;
+      transition: all 0.25s;
+    }
+    .pipe-box:hover { border-color: var(--accent2); box-shadow: 0 0 20px rgba(6,182,212,0.15); }
+    .pipe-emoji { font-size: 1.6rem; margin-bottom: 6px; }
+    .pipe-label { font-size: 0.75rem; font-weight: 600; }
+    .pipe-sub { font-size: 0.65rem; color: var(--muted); margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
+
+    /* ── CONTACT FORM ── */
+    .contact-section {
+      padding: 80px 5%;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 60px; max-width: 1100px; margin: 0 auto;
+      align-items: start;
+    }
+
+    .contact-info h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+      font-weight: 800; margin-bottom: 16px;
+    }
+    .contact-info p { color: var(--muted); line-height: 1.7; margin-bottom: 32px; }
+
+    .contact-feature {
+      display: flex; align-items: flex-start; gap: 14px; margin-bottom: 20px;
+    }
+    .cf-icon {
+      width: 40px; height: 40px; flex-shrink: 0;
+      background: rgba(59,130,246,0.1);
+      border: 1px solid rgba(59,130,246,0.2);
+      border-radius: 10px;
+      display: grid; place-items: center; font-size: 1.1rem;
+    }
+    .cf-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 3px; }
+    .cf-desc { color: var(--muted); font-size: 0.825rem; line-height: 1.5; }
+
+    .form-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px; padding: 36px;
+    }
+    .form-card h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.3rem; font-weight: 700;
+      margin-bottom: 24px;
+    }
+
+    .form-group { margin-bottom: 18px; }
+    .form-group label {
+      display: block; font-size: 0.82rem; font-weight: 600;
+      color: var(--muted); margin-bottom: 7px;
+      font-family: 'IBM Plex Mono', monospace;
+      letter-spacing: 0.05em;
+    }
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%; padding: 12px 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text);
+      font-family: 'Manrope', sans-serif; font-size: 0.9rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+    }
+    .form-group textarea { resize: vertical; min-height: 110px; }
+    .form-group select option { background: var(--card); }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .submit-btn {
+      width: 100%; padding: 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent3));
+      color: #fff; border: none; border-radius: 10px;
+      font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700;
+      cursor: pointer; margin-top: 6px;
+      transition: all 0.3s;
+      position: relative; overflow: hidden;
+    }
+    .submit-btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .submit-btn:hover::before { opacity: 1; }
+    .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(59,130,246,0.4); }
+    .submit-btn span { position: relative; z-index: 1; }
+
+    /* ── SUCCESS MSG ── */
+    #success-msg {
+      display: none;
+      margin-top: 16px; padding: 14px;
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 10px; color: var(--green);
+      font-size: 0.875rem; text-align: center;
+    }
+
+    /* ── LOGOS / TOOLS ── */
+    .tools-section { padding: 60px 5%; text-align: center; border-top: 1px solid var(--border); }
+    .tools-section p { color: var(--muted); font-size: 0.85rem; margin-bottom: 28px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.08em; }
+    .tools-row {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 14px;
+    }
+    .tool-chip {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 20px;
+      font-size: 0.82rem; font-weight: 600; color: var(--muted);
+      display: flex; align-items: center; gap: 8px;
+      transition: all 0.2s;
+    }
+    .tool-chip:hover { border-color: var(--accent); color: var(--text); background: rgba(59,130,246,0.07); }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 5%;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 20px;
+      background: var(--surface);
+    }
+    .footer-brand { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; }
+    .footer-brand span { color: var(--accent); }
+    .footer-links { display: flex; gap: 24px; list-style: none; }
+    .footer-links a { color: var(--muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; }
+    .footer-links a:hover { color: var(--text); }
+    .footer-copy { color: var(--muted); font-size: 0.8rem; }
+
+    /* ── TERMINAL TICKER ── */
+    .ticker {
+      background: rgba(6,182,212,0.06);
+      border-top: 1px solid rgba(6,182,212,0.15);
+      border-bottom: 1px solid rgba(6,182,212,0.15);
+      padding: 10px 0; overflow: hidden;
+    }
+    .ticker-inner {
+      display: flex; gap: 60px;
+      animation: scroll 25s linear infinite;
+      white-space: nowrap;
+    }
+    .ticker-item {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.75rem; color: var(--accent2);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .ticker-item::before { content: '▸'; color: var(--green); }
+    @keyframes scroll { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .tiers { grid-template-columns: 1fr; }
+      .tiers::before { display: none; }
+      .contact-section { grid-template-columns: 1fr; }
+      .stats-bar { grid-template-columns: repeat(2,1fr); }
+      .pipeline { flex-direction: column; }
+      .pipe-step:not(:last-child)::after { content:'↓'; right: auto; top: auto; bottom: -18px; left: 50%; }
+      .nav-links { display: none; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    VickY<span>Cloud</span>
+  </div>
+  <ul class="nav-links">
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#services">Services</a></li>
+    <li><a href="#pipeline">Pipeline</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+  <a href="login.html" class="nav-cta" style="margin-right:10px;background:rgba(255,255,255,0.06);border:1px solid var(--border);">Login</a>
+  <a href="#contact" class="nav-cta">Get Started →</a>
+</nav>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-inner">
+    <span class="ticker-item">CI/CD Pipeline — Active</span>
+    <span class="ticker-item">Kubernetes Cluster — 99.98% Uptime</span>
+    <span class="ticker-item">Auto-scaling — Enabled</span>
+    <span class="ticker-item">SSL/TLS — Secured</span>
+    <span class="ticker-item">Docker Registry — Online</span>
+    <span class="ticker-item">Terraform State — Locked</span>
+    <span class="ticker-item">Monitoring — Prometheus + Grafana</span>
+    <span class="ticker-item">Zero Downtime Deployments — Active</span>
+    <!-- duplicate for seamless loop -->
+    <span class="ticker-item">CI/CD Pipeline — Active</span>
+    <span class="ticker-item">Kubernetes Cluster — 99.98% Uptime</span>
+    <span class="ticker-item">Auto-scaling — Enabled</span>
+    <span class="ticker-item">SSL/TLS — Secured</span>
+    <span class="ticker-item">Docker Registry — Online</span>
+    <span class="ticker-item">Terraform State — Locked</span>
+    <span class="ticker-item">Monitoring — Prometheus + Grafana</span>
+    <span class="ticker-item">Zero Downtime Deployments — Active</span>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="badge">v2.4 — Production Ready Platform</div>
+  <h1>VickYCloud DevOps<br><span class="grad">3-Tier Architecture</span></h1>
+  <p>Enterprise-grade infrastructure automation, CI/CD pipelines, and cloud orchestration — built by Vicky for teams that ship at scale.</p>
+  <div class="hero-btns">
+    <a href="#contact" class="btn-primary">Deploy Now →</a>
+    <a href="login.html" class="btn-ghost">Login to Console</a>
+    <a href="#architecture" class="btn-ghost">View Architecture</a>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div>
+    <div class="stat-val">99.98%</div>
+    <div class="stat-lbl">Uptime SLA</div>
+  </div>
+  <div>
+    <div class="stat-val">2.4s</div>
+    <div class="stat-lbl">Avg Deploy Time</div>
+  </div>
+  <div>
+    <div class="stat-val">500+</div>
+    <div class="stat-lbl">Microservices Managed</div>
+  </div>
+  <div>
+    <div class="stat-val">40+</div>
+    <div class="stat-lbl">Cloud Regions</div>
+  </div>
+</div>
+
+<!-- 3-TIER ARCHITECTURE -->
+<section class="arch-section" id="architecture">
+  <div class="section-label">// System Design</div>
+  <h2 class="section-title">3-Tier Architecture</h2>
+  <p class="section-sub">Decoupled layers for maximum scalability, security, and independent deployability across cloud environments.</p>
+
+  <div class="tiers">
+    <div class="tier-card">
+      <div class="tier-icon">🌐</div>
+      <h3>Presentation Tier</h3>
+      <p>React/Next.js frontend with CDN distribution, edge caching, and responsive UI served via global load balancers.</p>
+      <span class="tier-tag">nginx · CloudFront · React</span>
+    </div>
+    <div class="tier-card">
+      <div class="tier-icon">⚙️</div>
+      <h3>Application Tier</h3>
+      <p>Containerized microservices on Kubernetes with auto-scaling, service mesh, and API gateway orchestration.</p>
+      <span class="tier-tag">K8s · Docker · Node.js</span>
+    </div>
+    <div class="tier-card">
+      <div class="tier-icon">🗄️</div>
+      <h3>Data Tier</h3>
+      <p>Multi-region PostgreSQL clusters with read replicas, automated backups, Redis caching, and encryption at rest.</p>
+      <span class="tier-tag">PostgreSQL · Redis · S3</span>
+    </div>
+  </div>
+</section>
+
+<!-- SERVICES -->
+<section class="services" id="services">
+  <div style="text-align:center">
+    <div class="section-label">// Platform Services</div>
+    <h2 class="section-title">Everything You Need to Ship</h2>
+    <p class="section-sub">From infrastructure provisioning to observability — one platform, end to end.</p>
+  </div>
+  <div class="services-grid">
+    <div class="service-card">
+      <div class="svc-icon">🚀</div>
+      <div class="svc-name">CI/CD Automation</div>
+      <div class="svc-desc">Fully automated pipelines with blue-green deployments, canary releases, and instant rollback on failure detection.</div>
+      <div class="svc-tech"><span class="tech-pill">GitHub Actions</span><span class="tech-pill">Jenkins</span><span class="tech-pill">ArgoCD</span></div>
+    </div>
+    <div class="service-card">
+      <div class="svc-icon">☸️</div>
+      <div class="svc-name">Kubernetes Orchestration</div>
+      <div class="svc-desc">Managed K8s clusters with HPA, node auto-provisioning, pod disruption budgets, and multi-cluster federation.</div>
+      <div class="svc-tech"><span class="tech-pill">EKS</span><span class="tech-pill">GKE</span><span class="tech-pill">Helm</span></div>
+    </div>
+    <div class="service-card">
+      <div class="svc-icon">🏗️</div>
+      <div class="svc-name">Infrastructure as Code</div>
+      <div class="svc-desc">Version-controlled infrastructure with Terraform modules, drift detection, and policy-as-code enforcement.</div>
+      <div class="svc-tech"><span class="tech-pill">Terraform</span><span class="tech-pill">Ansible</span><span class="tech-pill">Pulumi</span></div>
+    </div>
+    <div class="service-card">
+      <div class="svc-icon">📊</div>
+      <div class="svc-name">Observability Stack</div>
+      <div class="svc-desc">Unified metrics, logs, and traces with real-time alerting, SLO tracking, and intelligent anomaly detection.</div>
+      <div class="svc-tech"><span class="tech-pill">Prometheus</span><span class="tech-pill">Grafana</span><span class="tech-pill">Jaeger</span></div>
+    </div>
+    <div class="service-card">
+      <div class="svc-icon">🔒</div>
+      <div class="svc-name">Security & Compliance</div>
+      <div class="svc-desc">Zero-trust networking, secrets management, RBAC, vulnerability scanning, and SOC 2 / ISO 27001 compliance.</div>
+      <div class="svc-tech"><span class="tech-pill">Vault</span><span class="tech-pill">OPA</span><span class="tech-pill">Trivy</span></div>
+    </div>
+    <div class="service-card">
+      <div class="svc-icon">☁️</div>
+      <div class="svc-name">Multi-Cloud Strategy</div>
+      <div class="svc-desc">Workload portability across AWS, Azure, and GCP with unified cost management and vendor-agnostic abstractions.</div>
+      <div class="svc-tech"><span class="tech-pill">AWS</span><span class="tech-pill">Azure</span><span class="tech-pill">GCP</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- CI/CD PIPELINE -->
+<section class="pipeline-section" id="pipeline">
+  <div style="text-align:center">
+    <div class="section-label">// Deployment Flow</div>
+    <h2 class="section-title">CI/CD Pipeline</h2>
+    <p class="section-sub" style="margin-bottom:44px">From code commit to production in minutes — automated, auditable, and reversible.</p>
+  </div>
+  <div class="pipeline">
+    <div class="pipe-step">
+      <div class="pipe-box">
+        <div class="pipe-emoji">💻</div>
+        <div class="pipe-label">Code Push</div>
+        <div class="pipe-sub">git push</div>
+      </div>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-box">
+        <div class="pipe-emoji">🔍</div>
+        <div class="pipe-label">Lint & Test</div>
+        <div class="pipe-sub">Jest / Pytest</div>
+      </div>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-box">
+        <div class="pipe-emoji">🐳</div>
+        <div class="pipe-label">Build Image</div>
+        <div class="pipe-sub">Docker Build</div>
+      </div>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-box">
+        <div class="pipe-emoji">🛡️</div>
+        <div class="pipe-label">Security Scan</div>
+        <div class="pipe-sub">Trivy / Snyk</div>
+      </div>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-box">
+        <div class="pipe-emoji">📦</div>
+        <div class="pipe-label">Push Registry</div>
+        <div class="pipe-sub">ECR / GCR</div>
+      </div>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-box">
+        <div class="pipe-emoji">🚀</div>
+        <div class="pipe-label">Deploy</div>
+        <div class="pipe-sub">K8s / ArgoCD</div>
+      </div>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-box">
+        <div class="pipe-emoji">✅</div>
+        <div class="pipe-label">Production</div>
+        <div class="pipe-sub">Live 🎉</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TOOLS ROW -->
+<div class="tools-section">
+  <p>TRUSTED CLOUD & DEVOPS TECHNOLOGIES</p>
+  <div class="tools-row">
+    <div class="tool-chip">🐳 Docker</div>
+    <div class="tool-chip">☸️ Kubernetes</div>
+    <div class="tool-chip">⚡ Terraform</div>
+    <div class="tool-chip">🔁 GitHub Actions</div>
+    <div class="tool-chip">☁️ AWS</div>
+    <div class="tool-chip">🔵 Azure</div>
+    <div class="tool-chip">🟡 GCP</div>
+    <div class="tool-chip">📊 Grafana</div>
+    <div class="tool-chip">🔴 Prometheus</div>
+    <div class="tool-chip">🔑 HashiCorp Vault</div>
+    <div class="tool-chip">🧩 Helm</div>
+    <div class="tool-chip">🟠 ArgoCD</div>
+  </div>
+</div>
+
+<!-- CONTACT FORM -->
+<section id="contact" style="padding: 80px 0;">
+  <div style="text-align:center;padding:0 5%">
+    <div class="section-label">// Get In Touch</div>
+    <h2 class="section-title">Start Your Cloud Journey</h2>
+    <p class="section-sub">Tell us about your infrastructure needs and we'll design the perfect DevOps solution for your team.</p>
+  </div>
+
+  <div class="contact-section">
+    <div class="contact-info">
+      <h2>Why Teams Choose <span style="background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">VickYCloud</span></h2>
+      <p>We help engineering teams move faster with battle-tested cloud infrastructure, automated pipelines, and 24/7 platform reliability.</p>
+
+      <div class="contact-feature">
+        <div class="cf-icon">⚡</div>
+        <div>
+          <div class="cf-title">Rapid Onboarding</div>
+          <div class="cf-desc">Get your full infrastructure stack running in production within 48 hours of kickoff.</div>
+        </div>
+      </div>
+      <div class="contact-feature">
+        <div class="cf-icon">🛡️</div>
+        <div>
+          <div class="cf-title">Enterprise Security</div>
+          <div class="cf-desc">SOC 2 compliant, zero-trust architecture, and automated vulnerability remediation.</div>
+        </div>
+      </div>
+      <div class="contact-feature">
+        <div class="cf-icon">📈</div>
+        <div>
+          <div class="cf-title">Scale Without Limits</div>
+          <div class="cf-desc">Auto-scaling from 1 to millions of requests with no manual intervention required.</div>
+        </div>
+      </div>
+      <div class="contact-feature">
+        <div class="cf-icon">🔧</div>
+        <div>
+          <div class="cf-title">24/7 SRE Support</div>
+          <div class="cf-desc">Dedicated site reliability engineers on call with P1 incident response under 15 minutes.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <h3>🚀 Request a Demo</h3>
+      <form id="contact-form" action="/submit.php" method="POST">
+        <div class="form-row">
+          <div class="form-group">
+            <label>FIRST NAME</label>
+            <input type="text" name="first_name" placeholder="Jane" required/>
+          </div>
+          <div class="form-group">
+            <label>LAST NAME</label>
+            <input type="text" name="last_name" placeholder="Smith" required/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>WORK EMAIL</label>
+          <input type="email" name="email" placeholder="jane@company.com" required/>
+        </div>
+        <div class="form-group">
+          <label>COMPANY</label>
+          <input type="text" name="company" placeholder="Acme Corp"/>
+        </div>
+        <div class="form-group">
+          <label>CLOUD PROVIDER</label>
+          <select name="cloud">
+            <option value="">Select your stack...</option>
+            <option>AWS</option>
+            <option>Google Cloud</option>
+            <option>Azure</option>
+            <option>Multi-Cloud</option>
+            <option>On-Premise / Hybrid</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>MESSAGE</label>
+          <textarea name="message" placeholder="Describe your infrastructure goals or current challenges..."></textarea>
+        </div>
+        <button type="submit" class="submit-btn"><span>Submit Request →</span></button>
+        <div id="success-msg">✅ Message received! Our team will reach out within 24 hours.</div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-brand">VickY<span>Cloud</span></div>
+  <ul class="footer-links">
+    <li><a href="#">Docs</a></li>
+    <li><a href="#">Blog</a></li>
+    <li><a href="#">Status</a></li>
+    <li><a href="#">Privacy</a></li>
+    <li><a href="#">Terms</a></li>
+  </ul>
+  <div class="footer-copy">© 2025 VickYCloud Platform. Built for modern DevOps teams.</div>
+</footer>
+
+<script>
+  // Form submit feedback
+  document.getElementById('contact-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    document.getElementById('success-msg').style.display = 'block';
+    this.reset();
+    setTimeout(() => document.getElementById('success-msg').style.display = 'none', 5000);
+  });
+
+  // Scroll reveal for cards
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.style.opacity = '1';
+        e.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.service-card, .tier-card, .contact-feature').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(24px)';
+    el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    observer.observe(el);
+  });
+</script>
+</body>
+</html>

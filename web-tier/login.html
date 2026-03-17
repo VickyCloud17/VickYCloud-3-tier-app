@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VickYCloud — Secure Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #04060f;
+      --surface: #090d1e;
+      --card:    #0b1120;
+      --border:  rgba(99,179,255,0.12);
+      --accent:  #3b82f6;
+      --accent2: #06b6d4;
+      --accent3: #8b5cf6;
+      --text:    #e8edf8;
+      --muted:   #7a8aaa;
+      --green:   #10b981;
+      --red:     #ef4444;
+      --glow:    rgba(59,130,246,0.3);
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'Manrope', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      display: flex;
+    }
+
+    /* ── ANIMATED BACKGROUND CANVAS ── */
+    #bg-canvas {
+      position: fixed; inset: 0; z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ── GRID ── */
+    .grid-overlay {
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(99,179,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,179,255,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    /* ══════════════════════════════════════
+       LEFT PANEL — DevOps Info Side
+    ══════════════════════════════════════ */
+    .left-panel {
+      position: relative; z-index: 1;
+      width: 55%;
+      display: flex; flex-direction: column;
+      justify-content: space-between;
+      padding: 40px 52px;
+      border-right: 1px solid var(--border);
+      background: linear-gradient(135deg,
+        rgba(9,13,30,0.95) 0%,
+        rgba(4,6,15,0.98) 100%);
+      overflow: hidden;
+    }
+
+    /* Radial glows on left */
+    .left-panel::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 20% 20%, rgba(59,130,246,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 80% 70%, rgba(139,92,246,0.06) 0%, transparent 55%);
+      pointer-events: none;
+    }
+
+    /* ── Top brand ── */
+    .brand {
+      display: flex; align-items: center; gap: 12px;
+      font-family: 'Syne', sans-serif;
+      font-size: 1.4rem; font-weight: 800;
+      position: relative; z-index: 2;
+    }
+    .brand-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent3));
+      border-radius: 9px;
+      display: grid; place-items: center;
+      font-size: 1rem;
+      box-shadow: 0 0 16px var(--glow);
+    }
+    .brand span { color: var(--accent); }
+
+    /* ── Middle hero content ── */
+    .left-hero { position: relative; z-index: 2; }
+
+    .left-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.25);
+      border-radius: 100px; padding: 5px 14px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.7rem; color: var(--green);
+      margin-bottom: 24px;
+      animation: fadeUp 0.6s ease both;
+    }
+    .left-badge::before {
+      content: '●'; font-size: 0.45rem;
+      animation: pulse 2s infinite;
+    }
+
+    .left-hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      font-weight: 800; line-height: 1.1;
+      margin-bottom: 16px;
+      animation: fadeUp 0.6s 0.1s ease both;
+    }
+    .left-hero h1 .grad {
+      background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .left-hero p {
+      color: var(--muted); font-size: 0.92rem; line-height: 1.75;
+      max-width: 420px;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+
+    /* ── Architecture diagram (SVG-like CSS) ── */
+    .arch-diagram {
+      margin-top: 36px;
+      position: relative; z-index: 2;
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+
+    .arch-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem; color: var(--accent2);
+      letter-spacing: 0.12em; text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .arch-tiers {
+      display: flex; gap: 0; align-items: stretch;
+    }
+
+    .arch-tier {
+      flex: 1;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 12px;
+      position: relative;
+      transition: all 0.3s;
+    }
+    .arch-tier:hover {
+      border-color: var(--accent);
+      background: rgba(59,130,246,0.06);
+      transform: translateY(-3px);
+    }
+    .arch-tier + .arch-tier { margin-left: -1px; border-radius: 0; }
+    .arch-tier:first-child { border-radius: 10px 0 0 10px; }
+    .arch-tier:last-child  { border-radius: 0 10px 10px 0; }
+
+    .arch-tier-top {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .arch-tier-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+    .tier-1 .arch-tier-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .tier-2 .arch-tier-dot { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+    .tier-3 .arch-tier-dot { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+
+    .arch-tier-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.62rem; font-weight: 500;
+      color: var(--muted);
+    }
+    .arch-tier-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.78rem; font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .arch-tier-tech {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.6rem; color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .arch-arrow {
+      display: flex; align-items: center;
+      padding: 0 4px; color: var(--accent);
+      font-size: 0.9rem; flex-shrink: 0;
+      opacity: 0.5;
+    }
+
+    /* ── Live metrics strip ── */
+    .metrics-strip {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 10px; margin-top: 20px;
+      position: relative; z-index: 2;
+      animation: fadeUp 0.6s 0.4s ease both;
+    }
+    .metric-box {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 12px;
+    }
+    .metric-val {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.95rem; font-weight: 500;
+      color: var(--accent2);
+    }
+    .metric-lbl {
+      font-size: 0.65rem; color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── Terminal log at bottom ── */
+    .terminal {
+      position: relative; z-index: 2;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(99,179,255,0.1);
+      border-radius: 10px; padding: 14px 16px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem;
+      animation: fadeUp 0.6s 0.5s ease both;
+    }
+    .terminal-bar {
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 10px; padding-bottom: 10px;
+      border-bottom: 1px solid rgba(99,179,255,0.08);
+    }
+    .t-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .t-red    { background: #ff5f57; }
+    .t-yellow { background: #febc2e; }
+    .t-green  { background: #28c840; }
+    .t-title  { color: var(--muted); font-size: 0.65rem; margin-left: 6px; }
+
+    .t-line { display: flex; gap: 8px; margin-bottom: 4px; line-height: 1.5; }
+    .t-prompt { color: var(--accent2); }
+    .t-cmd    { color: #e8edf8; }
+    .t-ok     { color: var(--green); }
+    .t-warn   { color: #f59e0b; }
+    .t-cursor {
+      display: inline-block; width: 6px; height: 12px;
+      background: var(--accent); margin-left: 2px;
+      animation: blink 1s step-end infinite;
+      vertical-align: text-bottom;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* ══════════════════════════════════════
+       RIGHT PANEL — Login Form
+    ══════════════════════════════════════ */
+    .right-panel {
+      position: relative; z-index: 1;
+      width: 45%;
+      display: flex; align-items: center; justify-content: center;
+      padding: 40px 52px;
+      background: rgba(4,6,15,0.98);
+    }
+
+    .login-box {
+      width: 100%; max-width: 400px;
+    }
+
+    .login-header { margin-bottom: 32px; }
+    .login-header h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.9rem; font-weight: 800;
+      margin-bottom: 8px;
+      animation: fadeUp 0.5s ease both;
+    }
+    .login-header p {
+      color: var(--muted); font-size: 0.875rem;
+      animation: fadeUp 0.5s 0.05s ease both;
+    }
+
+    /* ── OAuth buttons ── */
+    .oauth-row {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; margin-bottom: 24px;
+      animation: fadeUp 0.5s 0.1s ease both;
+    }
+    .oauth-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text); font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+      transition: all 0.2s;
+      font-family: 'Manrope', sans-serif;
+    }
+    .oauth-btn:hover {
+      border-color: var(--accent);
+      background: rgba(59,130,246,0.06);
+      transform: translateY(-1px);
+    }
+    .oauth-icon { font-size: 1rem; }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.5s 0.15s ease both;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px;
+      background: var(--border);
+    }
+    .divider span {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem; color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* ── Form fields ── */
+    .form-group {
+      margin-bottom: 16px;
+      animation: fadeUp 0.5s ease both;
+    }
+    .form-group:nth-child(1) { animation-delay: 0.18s; }
+    .form-group:nth-child(2) { animation-delay: 0.22s; }
+
+    .form-group label {
+      display: block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.72rem; font-weight: 500;
+      color: var(--muted); letter-spacing: 0.08em;
+      margin-bottom: 7px;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+    .input-icon {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.9rem; pointer-events: none;
+      opacity: 0.5;
+    }
+    .input-wrap input {
+      width: 100%; padding: 12px 42px 12px 40px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text); font-family: 'Manrope', sans-serif; font-size: 0.9rem;
+      outline: none; transition: all 0.25s;
+    }
+    .input-wrap input:focus {
+      border-color: var(--accent);
+      background: rgba(59,130,246,0.05);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+    }
+    .input-wrap input::placeholder { color: rgba(122,138,170,0.5); }
+
+    /* password toggle */
+    .pwd-toggle {
+      position: absolute; right: 14px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 0.85rem;
+      padding: 0; line-height: 1;
+      transition: color 0.2s;
+    }
+    .pwd-toggle:hover { color: var(--text); }
+
+    /* ── Remember + forgot ── */
+    .form-meta {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px;
+      animation: fadeUp 0.5s 0.26s ease both;
+    }
+    .remember {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.82rem; color: var(--muted); cursor: pointer;
+    }
+    .remember input[type="checkbox"] {
+      appearance: none; width: 16px; height: 16px;
+      border: 1px solid var(--border); border-radius: 4px;
+      background: rgba(255,255,255,0.04);
+      cursor: pointer; position: relative; transition: all 0.2s;
+    }
+    .remember input[type="checkbox"]:checked {
+      background: var(--accent); border-color: var(--accent);
+    }
+    .remember input[type="checkbox"]:checked::after {
+      content: '✓'; position: absolute;
+      top: -1px; left: 2px;
+      font-size: 0.7rem; color: #fff;
+    }
+    .forgot { font-size: 0.82rem; color: var(--accent); text-decoration: none; }
+    .forgot:hover { text-decoration: underline; }
+
+    /* ── Submit ── */
+    .login-btn {
+      width: 100%; padding: 13px;
+      background: linear-gradient(135deg, var(--accent), var(--accent3));
+      color: #fff; border: none; border-radius: 10px;
+      font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700;
+      cursor: pointer; position: relative; overflow: hidden;
+      transition: all 0.3s;
+      animation: fadeUp 0.5s 0.3s ease both;
+    }
+    .login-btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .login-btn:hover::before { opacity: 1; }
+    .login-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(59,130,246,0.4); }
+    .login-btn span { position: relative; z-index: 1; }
+
+    /* loading state */
+    .login-btn.loading span { opacity: 0; }
+    .login-btn.loading::after {
+      content: '';
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+    /* ── Error / Success alerts ── */
+    .alert {
+      display: none; margin-top: 14px; padding: 12px 16px;
+      border-radius: 10px; font-size: 0.82rem;
+      animation: fadeUp 0.3s ease both;
+    }
+    .alert.error {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #fca5a5;
+    }
+    .alert.success {
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.3);
+      color: #6ee7b7;
+    }
+    .alert.show { display: flex; align-items: center; gap: 8px; }
+
+    /* ── Signup link ── */
+    .signup-link {
+      text-align: center; margin-top: 24px;
+      font-size: 0.845rem; color: var(--muted);
+      animation: fadeUp 0.5s 0.35s ease both;
+    }
+    .signup-link a { color: var(--accent); text-decoration: none; font-weight: 600; }
+    .signup-link a:hover { text-decoration: underline; }
+
+    /* ── MFA Modal ── */
+    .mfa-modal {
+      display: none;
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(4,6,15,0.85);
+      backdrop-filter: blur(8px);
+      align-items: center; justify-content: center;
+    }
+    .mfa-modal.open { display: flex; }
+
+    .mfa-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px; padding: 36px;
+      width: 340px; text-align: center;
+      animation: scaleIn 0.3s ease both;
+    }
+    .mfa-icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .mfa-box h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.2rem; font-weight: 700; margin-bottom: 8px;
+    }
+    .mfa-box p { color: var(--muted); font-size: 0.85rem; margin-bottom: 24px; line-height: 1.6; }
+
+    .otp-row {
+      display: flex; gap: 8px; justify-content: center; margin-bottom: 20px;
+    }
+    .otp-input {
+      width: 44px; height: 52px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      text-align: center; font-size: 1.2rem; font-weight: 700;
+      color: var(--text); font-family: 'IBM Plex Mono', monospace;
+      outline: none; transition: all 0.2s;
+    }
+    .otp-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    }
+
+    .mfa-verify-btn {
+      width: 100%; padding: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; border: none; border-radius: 10px;
+      font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .mfa-verify-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--glow); }
+
+    .mfa-resend {
+      margin-top: 14px; font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .mfa-resend a { color: var(--accent); cursor: pointer; text-decoration: none; }
+
+    /* ── Security badges ── */
+    .security-badges {
+      display: flex; justify-content: center; gap: 16px;
+      margin-top: 28px;
+      animation: fadeUp 0.5s 0.4s ease both;
+    }
+    .sec-badge {
+      display: flex; align-items: center; gap: 5px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.62rem; color: var(--muted);
+    }
+    .sec-badge span { font-size: 0.7rem; }
+
+    /* ── Animations ── */
+    @keyframes fadeUp   { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
+    @keyframes scaleIn  { from{opacity:0;transform:scale(0.94)} to{opacity:1;transform:none} }
+    @keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    @keyframes float    {
+      0%,100% { transform: translateY(0px); }
+      50%     { transform: translateY(-8px); }
+    }
+
+    /* ── Floating particles (CSS only) ── */
+    .particles {
+      position: fixed; inset: 0; z-index: 0;
+      pointer-events: none; overflow: hidden;
+    }
+    .particle {
+      position: absolute; border-radius: 50%;
+      background: var(--accent); opacity: 0;
+      animation: particleFloat linear infinite;
+    }
+    @keyframes particleFloat {
+      0%   { opacity: 0; transform: translateY(100vh) scale(0); }
+      10%  { opacity: 0.4; }
+      90%  { opacity: 0.15; }
+      100% { opacity: 0; transform: translateY(-10vh) scale(1.2); }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      body { overflow: auto; flex-direction: column; }
+      .left-panel { width: 100%; min-height: auto; padding: 28px 24px; border-right: none; border-bottom: 1px solid var(--border); }
+      .right-panel { width: 100%; padding: 32px 24px 48px; }
+      .metrics-strip { grid-template-columns: repeat(2,1fr); }
+      .terminal { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- Floating particles -->
+<div class="particles" id="particles"></div>
+
+<!-- MFA MODAL -->
+<div class="mfa-modal" id="mfaModal">
+  <div class="mfa-box">
+    <div class="mfa-icon">🔐</div>
+    <h3>Two-Factor Auth</h3>
+    <p>Enter the 6-digit code from your authenticator app or SMS to verify your identity.</p>
+    <div class="otp-row">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric"/>
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric"/>
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric"/>
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric"/>
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric"/>
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric"/>
+    </div>
+    <button class="mfa-verify-btn" onclick="verifyMFA()">Verify & Sign In →</button>
+    <div class="mfa-resend">Didn't get a code? <a onclick="resendOTP()">Resend</a></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════ -->
+<!--   LEFT PANEL                    -->
+<!-- ════════════════════════════════ -->
+<div class="left-panel">
+
+  <!-- Brand -->
+  <div class="brand">
+    <div class="brand-icon">⚡</div>
+    VickY<span>Cloud</span>
+  </div>
+
+  <!-- Hero -->
+  <div class="left-hero">
+    <div class="left-badge">● All Systems Operational</div>
+    <h1>DevOps Control<br><span class="grad">Platform</span></h1>
+    <p>Unified access to your CI/CD pipelines, Kubernetes clusters, infrastructure state, and observability stack — all from one secure console.</p>
+
+    <!-- 3-Tier Architecture mini diagram -->
+    <div class="arch-diagram">
+      <div class="arch-title">// 3-Tier Architecture</div>
+      <div style="display:flex; align-items:center; gap:4px;">
+        <div class="arch-tier tier-1">
+          <div class="arch-tier-top">
+            <div class="arch-tier-dot"></div>
+            <span class="arch-tier-label">TIER 1</span>
+          </div>
+          <div class="arch-tier-name">🌐 Presentation</div>
+          <div class="arch-tier-tech">nginx · React<br>CloudFront</div>
+        </div>
+        <div class="arch-arrow">⇄</div>
+        <div class="arch-tier tier-2">
+          <div class="arch-tier-top">
+            <div class="arch-tier-dot"></div>
+            <span class="arch-tier-label">TIER 2</span>
+          </div>
+          <div class="arch-tier-name">⚙️ Application</div>
+          <div class="arch-tier-tech">K8s · Docker<br>Node.js / PHP</div>
+        </div>
+        <div class="arch-arrow">⇄</div>
+        <div class="arch-tier tier-3">
+          <div class="arch-tier-top">
+            <div class="arch-tier-dot"></div>
+            <span class="arch-tier-label">TIER 3</span>
+          </div>
+          <div class="arch-tier-name">🗄️ Data</div>
+          <div class="arch-tier-tech">MySQL · Redis<br>S3 Backup</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live metrics -->
+    <div class="metrics-strip">
+      <div class="metric-box">
+        <div class="metric-val">99.98%</div>
+        <div class="metric-lbl">Uptime</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-val">2.4s</div>
+        <div class="metric-lbl">Deploy</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-val">42</div>
+        <div class="metric-lbl">Pods Live</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-val" id="live-time">--:--</div>
+        <div class="metric-lbl">UTC Time</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Terminal -->
+  <div class="terminal">
+    <div class="terminal-bar">
+      <div class="t-dot t-red"></div>
+      <div class="t-dot t-yellow"></div>
+      <div class="t-dot t-green"></div>
+      <span class="t-title">vicky@cloudnex — k8s-prod-cluster</span>
+    </div>
+    <div class="t-line"><span class="t-prompt">$</span><span class="t-cmd"> kubectl get pods -n production</span></div>
+    <div class="t-line"><span class="t-ok">✓ frontend-pod-7f8b9c    Running   2d</span></div>
+    <div class="t-line"><span class="t-ok">✓ api-pod-5d6e7f         Running   2d</span></div>
+    <div class="t-line"><span class="t-ok">✓ mysql-service-3g4h5i   Running   2d</span></div>
+    <div class="t-line"><span class="t-warn">● redis-cache-1j2k3l     Pending   0s</span></div>
+    <div class="t-line"><span class="t-prompt">$</span><span class="t-cmd"> terraform plan</span><span class="t-cursor"></span></div>
+  </div>
+
+</div>
+
+<!-- ════════════════════════════════ -->
+<!--   RIGHT PANEL — Login Form      -->
+<!-- ════════════════════════════════ -->
+<div class="right-panel">
+  <div class="login-box">
+
+    <div class="login-header">
+      <h2>Welcome Back 👋</h2>
+      <p>Sign in to your VickYCloud DevOps console</p>
+    </div>
+
+    <!-- OAuth -->
+    <div class="oauth-row">
+      <a href="#" class="oauth-btn" onclick="oauthLogin('GitHub')">
+        <span class="oauth-icon">🐙</span> GitHub SSO
+      </a>
+      <a href="#" class="oauth-btn" onclick="oauthLogin('Google')">
+        <span class="oauth-icon">🔵</span> Google SSO
+      </a>
+    </div>
+
+    <div class="divider"><span>or sign in with credentials</span></div>
+
+    <!-- Login Form -->
+    <form id="loginForm" action="login.php" method="POST" onsubmit="handleLogin(event)">
+
+      <div class="form-group">
+        <label>EMAIL / USERNAME</label>
+        <div class="input-wrap">
+          <span class="input-icon">👤</span>
+          <input type="text" name="username" id="username"
+                 placeholder="admin@vicky.cloud" autocomplete="username" required/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>PASSWORD</label>
+        <div class="input-wrap">
+          <span class="input-icon">🔑</span>
+          <input type="password" name="password" id="password"
+                 placeholder="••••••••••••" autocomplete="current-password" required/>
+          <button type="button" class="pwd-toggle" onclick="togglePwd()" id="pwdToggle">👁</button>
+        </div>
+      </div>
+
+      <div class="form-meta">
+        <label class="remember">
+          <input type="checkbox" name="remember"/>
+          Remember this device
+        </label>
+        <a href="forgot-password.php" class="forgot">Forgot password?</a>
+      </div>
+
+      <button type="submit" class="login-btn" id="loginBtn">
+        <span>Sign In to Console →</span>
+      </button>
+
+      <div class="alert error" id="errorAlert">
+        <span>🚫</span> <span id="errorMsg">Invalid credentials. Please try again.</span>
+      </div>
+      <div class="alert success" id="successAlert">
+        <span>✅</span> <span>Authenticated! Redirecting to dashboard…</span>
+      </div>
+
+    </form>
+
+    <div class="signup-link">
+      New to VickYCloud? <a href="register.php">Request Access →</a>
+    </div>
+
+    <!-- Security badges -->
+    <div class="security-badges">
+      <div class="sec-badge"><span>🔒</span> TLS 1.3</div>
+      <div class="sec-badge"><span>🛡️</span> SOC 2</div>
+      <div class="sec-badge"><span>🔐</span> MFA Ready</div>
+      <div class="sec-badge"><span>☁️</span> Zero Trust</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════ -->
+<script>
+  /* ── Live UTC clock ── */
+  function updateClock() {
+    const now = new Date();
+    const h = String(now.getUTCHours()).padStart(2,'0');
+    const m = String(now.getUTCMinutes()).padStart(2,'0');
+    document.getElementById('live-time').textContent = `${h}:${m}`;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  /* ── Floating particles ── */
+  (function createParticles() {
+    const container = document.getElementById('particles');
+    const colors = ['rgba(59,130,246,', 'rgba(6,182,212,', 'rgba(139,92,246,'];
+    for (let i = 0; i < 18; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const size = Math.random() * 3 + 1;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      p.style.cssText = `
+        width:${size}px; height:${size}px;
+        left:${Math.random()*100}%;
+        background:${color}0.8);
+        animation-duration:${8 + Math.random()*12}s;
+        animation-delay:${Math.random()*10}s;
+      `;
+      container.appendChild(p);
+    }
+  })();
+
+  /* ── Canvas star field ── */
+  (function initCanvas() {
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    let stars = [];
+
+    function resize() {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    for (let i = 0; i < 120; i++) {
+      stars.push({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        r: Math.random() * 1.2,
+        a: Math.random(),
+        s: Math.random() * 0.003 + 0.001
+      });
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      stars.forEach(star => {
+        star.a += star.s;
+        if (star.a > 1) { star.a = 0; star.x = Math.random() * canvas.width; star.y = Math.random() * canvas.height; }
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(180, 210, 255, ${star.a * 0.6})`;
+        ctx.fill();
+      });
+      requestAnimationFrame(draw);
+    }
+    draw();
+  })();
+
+  /* ── Password toggle ── */
+  function togglePwd() {
+    const inp = document.getElementById('password');
+    const btn = document.getElementById('pwdToggle');
+    if (inp.type === 'password') { inp.type = 'text';     btn.textContent = '🙈'; }
+    else                         { inp.type = 'password'; btn.textContent = '👁'; }
+  }
+
+  /* ── Login handler ── */
+  function handleLogin(e) {
+    e.preventDefault();
+    const btn   = document.getElementById('loginBtn');
+    const errEl = document.getElementById('errorAlert');
+    const sucEl = document.getElementById('successAlert');
+    errEl.classList.remove('show');
+    sucEl.classList.remove('show');
+    btn.classList.add('loading');
+
+    const formData = new FormData(document.getElementById('loginForm'));
+
+    fetch('/login.php', {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => {
+      btn.classList.remove('loading');
+      if (res.redirected) {
+        // Server redirected to dashboard — login success
+        sucEl.classList.add('show');
+        setTimeout(() => window.location.href = res.url, 1000);
+      } else if (res.ok) {
+        sucEl.classList.add('show');
+        setTimeout(() => window.location.href = '/dashboard.php', 1000);
+      } else {
+        document.getElementById('errorMsg').textContent =
+          'Invalid credentials. Please try again.';
+        errEl.classList.add('show');
+      }
+    })
+    .catch(() => {
+      btn.classList.remove('loading');
+      document.getElementById('errorMsg').textContent =
+        'Connection error. Please try again.';
+      errEl.classList.add('show');
+    });
+  }
+
+  /* ── OTP auto-advance ── */
+  document.querySelectorAll('.otp-input').forEach((inp, idx, all) => {
+    inp.addEventListener('input', () => {
+      if (inp.value.length === 1 && idx < all.length - 1) all[idx+1].focus();
+    });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !inp.value && idx > 0) all[idx-1].focus();
+    });
+  });
+
+  /* ── MFA verify ── */
+  function verifyMFA() {
+    const code = [...document.querySelectorAll('.otp-input')].map(i => i.value).join('');
+    if (code.length < 6) { alert('Please enter all 6 digits.'); return; }
+    document.getElementById('mfaModal').classList.remove('open');
+    document.getElementById('successAlert').classList.add('show');
+    // Real app: submit e.preventDefault form with OTP token to server
+    setTimeout(() => { window.location.href = 'dashboard.php'; }, 1600);
+  }
+
+  function resendOTP() {
+    alert('A new code has been sent to your registered device.');
+  }
+
+  /* ── OAuth placeholder ── */
+  function oauthLogin(provider) {
+    const btn = document.getElementById('loginBtn');
+    document.getElementById('errorAlert').classList.remove('show');
+    alert(`Redirecting to ${provider} SSO… (configure OAuth in login.php)`);
+  }
+</script>
+</body>
+</html>
