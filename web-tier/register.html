@@ -511,64 +511,43 @@
 
   document.getElementById('registerForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    let valid = true;
+    const btn     = document.getElementById('registerBtn');
+    const errEl   = document.getElementById('errorAlert');
+    const sucEl   = document.getElementById('successAlert');
+    const errMsg  = document.getElementById('errorMsg');
 
-    const fields = ['first_name', 'last_name', 'username', 'email', 'password', 'confirm_password'];
-    fields.forEach(f => {
-      const el  = document.getElementById(f);
-      const err = document.getElementById('err-' + f);
-      if (err) err.classList.remove('show');
-      if (el)  el.classList.remove('error');
-    });
+    // Clear previous errors
+    errEl.classList.remove('show');
+    sucEl.classList.remove('show');
+    document.querySelectorAll('.field-error').forEach(el => el.classList.remove('show'));
+    document.querySelectorAll('input').forEach(el => el.classList.remove('error'));
 
-    document.getElementById('errorAlert').classList.remove('show');
-    document.getElementById('successAlert').classList.remove('show');
+    // Get values
+    const first_name       = document.getElementById('first_name').value.trim();
+    const last_name        = document.getElementById('last_name').value.trim();
+    const username         = document.getElementById('username').value.trim();
+    const email            = document.getElementById('email').value.trim();
+    const password         = document.getElementById('password').value;
+    const confirm_password = document.getElementById('confirm_password').value;
+    const terms            = document.getElementById('terms').checked;
 
-    // Validate required fields
-    ['first_name','last_name','username','email','password','confirm_password'].forEach(f => {
-      const el = document.getElementById(f);
-      if (!el.value.trim()) {
-        el.classList.add('error');
-        const err = document.getElementById('err-' + f);
-        if (err) err.classList.add('show');
-        valid = false;
-      }
-    });
-
-    // Email format
-    const email = document.getElementById('email');
-    if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-      email.classList.add('error');
-      document.getElementById('err-email').classList.add('show');
-      valid = false;
+    // Validate
+    if (!first_name) { errMsg.textContent = 'First name is required.'; errEl.classList.add('show'); return; }
+    if (!last_name)  { errMsg.textContent = 'Last name is required.';  errEl.classList.add('show'); return; }
+    if (!username)   { errMsg.textContent = 'Username is required.';   errEl.classList.add('show'); return; }
+    if (!email)      { errMsg.textContent = 'Email is required.';      errEl.classList.add('show'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errMsg.textContent = 'Please enter a valid email address.';
+      errEl.classList.add('show'); return;
     }
+    if (!password)   { errMsg.textContent = 'Password is required.';   errEl.classList.add('show'); return; }
+    if (password.length < 8) { errMsg.textContent = 'Password must be at least 8 characters.'; errEl.classList.add('show'); return; }
+    if (!/[A-Z]/.test(password)) { errMsg.textContent = 'Password must contain at least one uppercase letter.'; errEl.classList.add('show'); return; }
+    if (!/[0-9]/.test(password)) { errMsg.textContent = 'Password must contain at least one number.'; errEl.classList.add('show'); return; }
+    if (password !== confirm_password) { errMsg.textContent = 'Passwords do not match.'; errEl.classList.add('show'); return; }
+    if (!terms) { errMsg.textContent = 'Please accept the Terms of Service.'; errEl.classList.add('show'); return; }
 
-    // Password strength
-    const pwd = document.getElementById('password').value;
-    if (pwd && (pwd.length < 8 || !/[A-Z]/.test(pwd) || !/[0-9]/.test(pwd))) {
-      document.getElementById('password').classList.add('error');
-      document.getElementById('err-password').classList.add('show');
-      valid = false;
-    }
-
-    // Password match
-    const cpwd = document.getElementById('confirm_password').value;
-    if (pwd && cpwd && pwd !== cpwd) {
-      document.getElementById('confirm_password').classList.add('error');
-      document.getElementById('err-confirm_password').classList.add('show');
-      valid = false;
-    }
-
-    // Terms
-    if (!document.getElementById('terms').checked) {
-      document.getElementById('errorMsg').textContent = 'Please accept the Terms of Service.';
-      document.getElementById('errorAlert').classList.add('show');
-      valid = false;
-    }
-
-    if (!valid) return;
-
-    const btn = document.getElementById('registerBtn');
+    // All good — submit
     btn.classList.add('loading');
 
     fetch('register.php', {
@@ -579,17 +558,17 @@
     .then(data => {
       btn.classList.remove('loading');
       if (data.success) {
-        document.getElementById('successAlert').classList.add('show');
+        sucEl.classList.add('show');
         setTimeout(() => window.location.href = 'login.html', 2000);
       } else {
-        document.getElementById('errorMsg').textContent = data.message;
-        document.getElementById('errorAlert').classList.add('show');
+        errMsg.textContent = data.message;
+        errEl.classList.add('show');
       }
     })
     .catch(() => {
       btn.classList.remove('loading');
-      document.getElementById('errorMsg').textContent = 'Connection error. Please try again.';
-      document.getElementById('errorAlert').classList.add('show');
+      errMsg.textContent = 'Connection error. Please try again.';
+      errEl.classList.add('show');
     });
   });
 </script>
