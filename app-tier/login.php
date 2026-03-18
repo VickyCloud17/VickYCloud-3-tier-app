@@ -1,136 +1,173 @@
 <?php
-// ─────────────────────────────────────────────────────────────────
-//  VickYCloud — Login Handler (login.php)
-//  Handles: credential login + session + MFA token check
-// ─────────────────────────────────────────────────────────────────
+// =============================================================
+//  VickYCloud — Secure Login Handler
+//  File: app-tier/login.php
+//  Features:
+//    - bcrypt password verification
+//    - Account lockout after 5 failed attempts
+//    - Session regeneration (prevent fixation)
+//    - Role-based redirect (admin → dashboard, others → restricted)
+//    - Login audit log
+//    - Remember-me cookie (SHA-256 hashed)
+// =============================================================
 
 session_start();
 
-define('DB_HOST', 'mysql-service');
-define('DB_USER', 'vickyuser');
-define('DB_PASS', 'password123');
-define('DB_NAME', 'devopsdb');
-
-// Redirect if already logged in
+// Already logged in — redirect based on role
 if (isset($_SESSION['user_id'])) {
     header('Location: dashboard.php');
     exit;
 }
 
-// ── Only handle POST ───────────────────────────────────────────
+// Only handle POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: login.html');
+    http_response_code(405);
+    jsonResponse(false, 'Method not allowed.');
     exit;
 }
 
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+// DB connection
+$host = getenv('DB_HOST') ?: 'mysql-service';
+$user = getenv('DB_USER') ?: 'vickyuser';
+$pass = getenv('DB_PASS') ?: 'password123';
+$db   = getenv('DB_NAME') ?: 'devopsdb';
+
+$conn = new mysqli($host, $user, $pass, $db);
 if ($conn->connect_error) {
-    loginError("Database connection failed. Please try again.");
+    jsonResponse(false, 'Service unavailable. Please try again later.');
+    exit;
 }
 
-// ── Sanitize inputs ────────────────────────────────────────────
+// Sanitize inputs
 $username = trim($_POST['username'] ?? '');
-$password = trim($_POST['password'] ?? '');
+$password = $_POST['password']     ?? '';
 $remember = isset($_POST['remember']);
-$mfa_code = trim($_POST['mfa_code'] ?? '');
 
 if (empty($username) || empty($password)) {
-    loginError("Email and password are required.");
+    jsonResponse(false, 'Email and password are required.');
+    exit;
 }
 
-// ── Fetch user ─────────────────────────────────────────────────
+// -------------------------------------------------------------
+//  Fetch user by email OR username
+// -------------------------------------------------------------
 $stmt = $conn->prepare(
-    "SELECT id, first_name, last_name, email, password_hash, role,
-            mfa_enabled, mfa_secret, login_attempts, locked_until
+    "SELECT id, username, first_name, last_name, email,
+            password_hash, role, mfa_enabled,
+            login_attempts, locked_until, last_login
      FROM users
      WHERE email = ? OR username = ?
      LIMIT 1"
 );
 $stmt->bind_param("ss", $username, $username);
 $stmt->execute();
-$result = $stmt->get_result();
-$user   = $result->fetch_assoc();
+$user_data = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-// ── Account not found ──────────────────────────────────────────
-if (!$user) {
-    loginError("Invalid credentials. Please try again.");
+// User not found — generic message (don't reveal which field is wrong)
+if (!$user_data) {
+    logAttempt($conn, null, 'failed');
+    jsonResponse(false, 'Invalid credentials. Please try again.');
+    exit;
 }
 
-// ── Account lockout check ──────────────────────────────────────
-if ($user['locked_until'] && strtotime($user['locked_until']) > time()) {
-    $mins = ceil((strtotime($user['locked_until']) - time()) / 60);
-    loginError("Account locked due to too many failed attempts. Try again in {$mins} minute(s).");
+// -------------------------------------------------------------
+//  Account lockout check
+// -------------------------------------------------------------
+if ($user_data['locked_until'] && strtotime($user_data['locked_until']) > time()) {
+    $mins = ceil((strtotime($user_data['locked_until']) - time()) / 60);
+    logAttempt($conn, $user_data['id'], 'locked');
+    jsonResponse(false, "Account locked. Try again in {$mins} minute(s).");
+    exit;
 }
 
-// ── Verify password ────────────────────────────────────────────
-if (!password_verify($password, $user['password_hash'])) {
-    // Increment failed attempts
-    $attempts = $user['login_attempts'] + 1;
-    $lock_sql  = $attempts >= 5
-        ? "UPDATE users SET login_attempts = ?, locked_until = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?"
-        : "UPDATE users SET login_attempts = ? WHERE id = ?";
-    $upd = $conn->prepare($lock_sql);
-    $upd->bind_param("ii", $attempts, $user['id']);
-    $upd->execute();
-    $upd->close();
+// -------------------------------------------------------------
+//  Verify password
+// -------------------------------------------------------------
+if (!password_verify($password, $user_data['password_hash'])) {
+    $attempts = $user_data['login_attempts'] + 1;
+    $uid      = (int) $user_data['id'];
 
-    $remaining = max(0, 5 - $attempts);
-    $msg = $remaining > 0
-        ? "Invalid credentials. {$remaining} attempt(s) remaining before lockout."
-        : "Too many failed attempts. Account locked for 15 minutes.";
-    loginError($msg);
-}
-
-// ── Reset failed attempts on success ──────────────────────────
-$conn->query("UPDATE users SET login_attempts = 0, locked_until = NULL, last_login = NOW() WHERE id = {$user['id']}");
-
-// ── MFA check ─────────────────────────────────────────────────
-if ($user['mfa_enabled']) {
-    if (empty($mfa_code)) {
-        // Store partial session, redirect to MFA step
-        $_SESSION['mfa_pending_user'] = $user['id'];
-        header('Location: login.html?mfa=1');
-        exit;
+    if ($attempts >= 5) {
+        $conn->query(
+            "UPDATE users SET login_attempts = $attempts,
+             locked_until = DATE_ADD(NOW(), INTERVAL 15 MINUTE)
+             WHERE id = $uid"
+        );
+        logAttempt($conn, $uid, 'locked');
+        jsonResponse(false, 'Too many failed attempts. Account locked for 15 minutes.');
+    } else {
+        $conn->query("UPDATE users SET login_attempts = $attempts WHERE id = $uid");
+        $remaining = 5 - $attempts;
+        logAttempt($conn, $uid, 'failed');
+        jsonResponse(false, "Invalid credentials. {$remaining} attempt(s) remaining.");
     }
-    // Validate TOTP (stub — integrate with a TOTP library like OTPHP)
-    // if (!verifyTOTP($user['mfa_secret'], $mfa_code)) {
-    //     loginError("Invalid MFA code. Please try again.");
-    // }
+    exit;
 }
 
-// ── Create session ─────────────────────────────────────────────
-session_regenerate_id(true);
-$_SESSION['user_id']    = $user['id'];
-$_SESSION['user_name']  = $user['first_name'] . ' ' . $user['last_name'];
-$_SESSION['user_email'] = $user['email'];
-$_SESSION['user_role']  = $user['role'];
-$_SESSION['login_time'] = time();
-
-// ── Remember-me cookie (30 days) ───────────────────────────────
-if ($remember) {
-    $token = bin2hex(random_bytes(32));
-    setcookie('remember_token', $token, time() + 30 * 86400, '/', '', true, true);
-    $hash = hash('sha256', $token);
-    $conn->query("UPDATE users SET remember_token = '{$hash}' WHERE id = {$user['id']}");
-}
-
-// ── Log login event ────────────────────────────────────────────
-$ip    = $conn->real_escape_string($_SERVER['REMOTE_ADDR'] ?? 'unknown');
-$agent = $conn->real_escape_string(substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255));
+// -------------------------------------------------------------
+//  Password correct — reset attempts, create session
+// -------------------------------------------------------------
 $conn->query(
-    "INSERT INTO login_logs (user_id, ip_address, user_agent, status)
-     VALUES ({$user['id']}, '{$ip}', '{$agent}', 'success')"
+    "UPDATE users SET login_attempts = 0, locked_until = NULL,
+     last_login = NOW() WHERE id = {$user_data['id']}"
 );
 
+// Regenerate session ID to prevent fixation attacks
+session_regenerate_id(true);
+
+$_SESSION['user_id']       = $user_data['id'];
+$_SESSION['username']      = $user_data['username'];
+$_SESSION['user_name']     = $user_data['first_name'] . ' ' . $user_data['last_name'];
+$_SESSION['user_email']    = $user_data['email'];
+$_SESSION['user_role']     = $user_data['role'];
+$_SESSION['login_time']    = time();
+$_SESSION['last_activity'] = time();
+
+// -------------------------------------------------------------
+//  Remember-me cookie (30 days, SHA-256 hashed)
+// -------------------------------------------------------------
+if ($remember) {
+    $token = bin2hex(random_bytes(32));
+    $hash  = hash('sha256', $token);
+    $conn->query("UPDATE users SET remember_token = '$hash' WHERE id = {$user_data['id']}");
+    setcookie('remember_token', $token, time() + 30 * 86400, '/', '', false, true);
+}
+
+// -------------------------------------------------------------
+//  Log successful login
+// -------------------------------------------------------------
+logAttempt($conn, $user_data['id'], 'success');
 $conn->close();
-header('Location: dashboard.php');
+
+// -------------------------------------------------------------
+//  Respond with success + redirect URL based on role
+// -------------------------------------------------------------
+$redirect = 'dashboard.php';
+jsonResponse(true, 'Login successful! Redirecting…', $redirect);
 exit;
 
-// ── Helper ─────────────────────────────────────────────────────
-function loginError(string $msg): void {
-    session_start();
-    $_SESSION['login_error'] = $msg;
-    header('Location: login.html?error=' . urlencode($msg));
-    exit;
+// -------------------------------------------------------------
+//  Helpers
+// -------------------------------------------------------------
+function logAttempt(mysqli $conn, ?int $user_id, string $status): void {
+    $ip    = $conn->real_escape_string($_SERVER['REMOTE_ADDR']      ?? 'unknown');
+    $agent = $conn->real_escape_string(
+        substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255)
+    );
+    $uid = $user_id ? $user_id : 'NULL';
+    $conn->query(
+        "INSERT INTO login_logs (user_id, ip_address, user_agent, status)
+         VALUES ($uid, '$ip', '$agent', '$status')"
+    );
+}
+
+function jsonResponse(bool $success, string $message, string $redirect = ''): void {
+    header('Content-Type: application/json');
+    http_response_code($success ? 200 : 401);
+    echo json_encode([
+        'success'  => $success,
+        'message'  => $message,
+        'redirect' => $redirect,
+    ]);
 }

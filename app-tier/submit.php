@@ -8,7 +8,7 @@
 session_start();
 
 define('DB_HOST', 'mysql-service');
-define('DB_USER', 'root');
+define('DB_USER', 'vickyuser');
 define('DB_PASS', 'password123');
 define('DB_NAME', 'devopsdb');
 

@@ -850,31 +850,24 @@
     sucEl.classList.remove('show');
     btn.classList.add('loading');
 
-    const formData = new FormData(document.getElementById('loginForm'));
-
-    fetch('/login.php', {
+    fetch('login.php', {
       method: 'POST',
-      body: formData
+      body: new FormData(document.getElementById('loginForm'))
     })
-    .then(res => {
+    .then(r => r.json())
+    .then(data => {
       btn.classList.remove('loading');
-      if (res.redirected) {
-        // Server redirected to dashboard — login success
+      if (data.success) {
         sucEl.classList.add('show');
-        setTimeout(() => window.location.href = res.url, 1000);
-      } else if (res.ok) {
-        sucEl.classList.add('show');
-        setTimeout(() => window.location.href = '/dashboard.php', 1000);
+        setTimeout(() => window.location.href = data.redirect || 'dashboard.php', 1000);
       } else {
-        document.getElementById('errorMsg').textContent =
-          'Invalid credentials. Please try again.';
+        document.getElementById('errorMsg').textContent = data.message;
         errEl.classList.add('show');
       }
     })
     .catch(() => {
       btn.classList.remove('loading');
-      document.getElementById('errorMsg').textContent =
-        'Connection error. Please try again.';
+      document.getElementById('errorMsg').textContent = 'Connection error. Please try again.';
       errEl.classList.add('show');
     });
   }
