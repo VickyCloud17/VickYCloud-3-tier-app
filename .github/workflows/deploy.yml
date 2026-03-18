@@ -44,13 +44,13 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: web-tier/Dockerfile
-          failure-threshold: warning
+          failure-threshold: error
 
       - name: Lint Dockerfiles — app tier
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: app-tier/Dockerfile
-          failure-threshold: warning
+          failure-threshold: error
 
       - name: Validate Kubernetes manifests (kubeval)
         run: |
