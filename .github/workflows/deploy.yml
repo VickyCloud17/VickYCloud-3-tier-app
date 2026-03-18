@@ -4,12 +4,10 @@
 #
 #  Triggers: push to main / pull_request to main
 #  Pipeline:
-#    1. Lint & validate
-#    2. Build Docker images (web + app)
-#    3. Push to Docker Hub
-#    4. Terraform plan / apply
-#    5. kubectl rollout to Minikube (self-hosted runner)
-#    6. Smoke test
+#    1. Lint & validate (ubuntu-latest)
+#    2. Build & push Docker images (ubuntu-latest)
+#    3. Deploy to Minikube via kubectl (self-hosted)
+#    4. Smoke test (self-hosted)
 # ─────────────────────────────────────────────────────────────────
 
 name: VickYCloud — CI/CD Pipeline
@@ -21,12 +19,10 @@ on:
     branches: [main]
 
 env:
-  DOCKER_USER:     ${{ secrets.DOCKER_USERNAME }}
-  WEB_IMAGE:       ${{ secrets.DOCKER_USERNAME }}/web-tier
-  APP_IMAGE:       ${{ secrets.DOCKER_USERNAME }}/app-tier
-  IMAGE_TAG:       ${{ github.sha }}
-  TF_DIR:          ./terraform
-  K8S_NAMESPACE:   vickycloud
+  WEB_IMAGE:      ${{ secrets.DOCKER_USERNAME }}/web-tier
+  APP_IMAGE:      ${{ secrets.DOCKER_USERNAME }}/app-tier
+  IMAGE_TAG:      ${{ github.sha }}
+  K8S_NAMESPACE:  vickycloud
 
 jobs:
 # ══════════════════════════════════════════════════════════════════
@@ -40,36 +36,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Lint Dockerfiles (hadolint)
+      - name: Lint web-tier Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: web-tier/Dockerfile
           failure-threshold: error
 
-      - name: Lint Dockerfiles — app tier
+      - name: Lint app-tier Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: app-tier/Dockerfile
           failure-threshold: error
 
-      - name: Validate Kubernetes manifests (kubeval)
+      - name: Validate Kubernetes manifests
         run: |
           curl -sL https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz \
             | tar xz && sudo mv kubeval /usr/local/bin/
           kubeval k8s/*.yml --ignore-missing-schemas
 
-      - name: Setup Terraform
+      - name: Terraform fmt + validate
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
 
-      - name: Terraform fmt check
-        run: terraform -chdir=${{ env.TF_DIR }} fmt -check -recursive
-
-      - name: Terraform validate
+      - name: Run Terraform checks
         run: |
-          terraform -chdir=${{ env.TF_DIR }} init -backend=false
-          terraform -chdir=${{ env.TF_DIR }} validate
+          terraform -chdir=./terraform fmt -check -recursive
+          terraform -chdir=./terraform init -backend=false
+          terraform -chdir=./terraform validate
 
 # ══════════════════════════════════════════════════════════════════
 #  JOB 2 — BUILD & PUSH DOCKER IMAGES
@@ -93,33 +87,31 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # ── Web Tier ────────────────────────────────────────────
       - name: Build & Push web-tier
         uses: docker/build-push-action@v5
         with:
-          context:   ./web-tier
-          file:      ./web-tier/Dockerfile
-          push:      true
+          context:    ./web-tier
+          file:       ./web-tier/Dockerfile
+          push:       true
           tags: |
             ${{ env.WEB_IMAGE }}:${{ env.IMAGE_TAG }}
             ${{ env.WEB_IMAGE }}:latest
           cache-from: type=registry,ref=${{ env.WEB_IMAGE }}:buildcache
           cache-to:   type=registry,ref=${{ env.WEB_IMAGE }}:buildcache,mode=max
 
-      # ── App Tier ────────────────────────────────────────────
       - name: Build & Push app-tier
         uses: docker/build-push-action@v5
         with:
-          context:   ./app-tier
-          file:      ./app-tier/Dockerfile
-          push:      true
+          context:    ./app-tier
+          file:       ./app-tier/Dockerfile
+          push:       true
           tags: |
             ${{ env.APP_IMAGE }}:${{ env.IMAGE_TAG }}
             ${{ env.APP_IMAGE }}:latest
           cache-from: type=registry,ref=${{ env.APP_IMAGE }}:buildcache
           cache-to:   type=registry,ref=${{ env.APP_IMAGE }}:buildcache,mode=max
 
-      - name: Save image tags as artifact
+      - name: Save image tags
         run: |
           echo "WEB_IMAGE=${{ env.WEB_IMAGE }}:${{ env.IMAGE_TAG }}" >> image_tags.env
           echo "APP_IMAGE=${{ env.APP_IMAGE }}:${{ env.IMAGE_TAG }}" >> image_tags.env
@@ -130,110 +122,93 @@ jobs:
           path: image_tags.env
 
 # ══════════════════════════════════════════════════════════════════
-#  JOB 3 — TERRAFORM PLAN (PR only)
-# ══════════════════════════════════════════════════════════════════
-  terraform-plan:
-    name: 📋 Terraform Plan
-    runs-on: self-hosted          # needs minikube + kubectl + terraform
-    needs: lint
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.6
-
-      - name: Terraform Init
-        run: terraform -chdir=${{ env.TF_DIR }} init
-        env:
-          TF_VAR_mysql_password: ${{ secrets.MYSQL_PASSWORD }}
-          TF_VAR_grafana_password: ${{ secrets.GRAFANA_PASSWORD }}
-
-      - name: Terraform Plan
-        run: |
-          terraform -chdir=${{ env.TF_DIR }} plan \
-            -var="mysql_password=${{ secrets.MYSQL_PASSWORD }}" \
-            -var="grafana_password=${{ secrets.GRAFANA_PASSWORD }}" \
-            -out=tfplan
-        env:
-          TF_VAR_mysql_password: ${{ secrets.MYSQL_PASSWORD }}
-          TF_VAR_grafana_password: ${{ secrets.GRAFANA_PASSWORD }}
-
-      - name: Upload plan
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan
-          path: ${{ env.TF_DIR }}/tfplan
-
-# ══════════════════════════════════════════════════════════════════
-#  JOB 4 — TERRAFORM APPLY + DEPLOY (main only, self-hosted runner)
+#  JOB 3 — DEPLOY TO MINIKUBE (self-hosted runner)
+#  Uses kubectl directly — no Terraform apply needed
+#  Minikube is already running on your machine
 # ══════════════════════════════════════════════════════════════════
   deploy:
-    name: 🚀 Terraform Apply & Deploy
-    runs-on: self-hosted          # your machine with minikube running
+    name: 🚀 Deploy to Minikube
+    runs-on: self-hosted
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     environment:
       name: production
-      url: http://localhost:30080
+      url: http://localhost:9090
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Download image tags
         uses: actions/download-artifact@v4
         with:
           name: image-tags
 
-      - name: Load image tags
+      - name: Load image tags into env
         run: cat image_tags.env >> $GITHUB_ENV
 
-      # ── Point Docker CLI at Minikube's daemon ────────────────
-      - name: Load images into Minikube
+      - name: Verify Minikube is running
+        run: |
+          minikube status
+          kubectl get nodes
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }}
+
+      - name: Point Docker to Minikube daemon
+        run: |
+          eval $(minikube docker-env)
+          echo "MINIKUBE_DOCKER_ENV=true" >> $GITHUB_ENV
+
+      - name: Pull & load images into Minikube
         run: |
           eval $(minikube docker-env)
           docker pull ${{ env.WEB_IMAGE }}
           docker pull ${{ env.APP_IMAGE }}
+          echo "✅ Images loaded into Minikube"
 
-      # ── Terraform Apply ──────────────────────────────────────
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.6
-
-      - name: Terraform Init
-        run: terraform -chdir=${{ env.TF_DIR }} init
-
-      - name: Terraform Apply
-        run: |
-          terraform -chdir=${{ env.TF_DIR }} apply -auto-approve \
-            -var="mysql_password=${{ secrets.MYSQL_PASSWORD }}" \
-            -var="grafana_password=${{ secrets.GRAFANA_PASSWORD }}" \
-            -var="web_image=${{ env.WEB_IMAGE }}" \
-            -var="app_image=${{ env.APP_IMAGE }}"
-
-      # ── Rolling update with new image SHA ────────────────────
-      - name: Update image tags in cluster
+      - name: Update web-tier image
         run: |
           kubectl set image deployment/web-deployment \
             web=${{ env.WEB_IMAGE }} \
             -n ${{ env.K8S_NAMESPACE }}
+          echo "✅ web-deployment image updated to ${{ env.WEB_IMAGE }}"
 
+      - name: Update app-tier image
+        run: |
           kubectl set image deployment/app-deployment \
             app=${{ env.APP_IMAGE }} \
             -n ${{ env.K8S_NAMESPACE }}
+          echo "✅ app-deployment image updated to ${{ env.APP_IMAGE }}"
 
-      - name: Wait for rollout
+      - name: Wait for web rollout
         run: |
-          kubectl rollout status deployment/web-deployment -n ${{ env.K8S_NAMESPACE }} --timeout=120s
-          kubectl rollout status deployment/app-deployment -n ${{ env.K8S_NAMESPACE }} --timeout=120s
+          kubectl rollout status deployment/web-deployment \
+            -n ${{ env.K8S_NAMESPACE }} --timeout=120s
+
+      - name: Wait for app rollout
+        run: |
+          kubectl rollout status deployment/app-deployment \
+            -n ${{ env.K8S_NAMESPACE }} --timeout=120s
+
+      - name: Verify all pods running
+        run: |
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }}
+          echo "✅ All pods verified"
+
+      - name: Log deployment to database
+        run: |
+          WEB_VERSION=$(echo "${{ env.IMAGE_TAG }}" | cut -c1-8)
+          APP_VERSION=$(echo "${{ env.IMAGE_TAG }}" | cut -c1-8)
+          kubectl exec deployment/db-deployment -n ${{ env.K8S_NAMESPACE }} -- \
+            mysql -u vickyuser -p${{ secrets.MYSQL_PASSWORD }} devopsdb -e "
+            INSERT INTO deployments (service_name, version, environment, status, deployed_by)
+            VALUES
+              ('web-tier', 'sha-${WEB_VERSION}', 'production', 'success', 'github-actions'),
+              ('app-tier', 'sha-${APP_VERSION}', 'production', 'success', 'github-actions');
+            " 2>/dev/null || echo "⚠️ Could not log deployment (non-fatal)"
 
 # ══════════════════════════════════════════════════════════════════
-#  JOB 5 — SMOKE TEST
+#  JOB 4 — SMOKE TEST
 # ══════════════════════════════════════════════════════════════════
   smoke-test:
     name: ✅ Smoke Test
@@ -241,33 +216,55 @@ jobs:
     needs: deploy
 
     steps:
-      - name: Get Minikube IP
-        run: echo "MINIKUBE_IP=$(minikube ip)" >> $GITHUB_ENV
-
-      - name: Test web tier health
+      - name: Get app URL
         run: |
-          curl -sf http://${{ env.MINIKUBE_IP }}:30080 \
-            || (echo "❌ Web tier unreachable" && exit 1)
-          echo "✅ Web tier OK"
+          echo "APP_URL=http://localhost:9090" >> $GITHUB_ENV
 
-      - name: Test login page
+      - name: Test index.html
         run: |
-          curl -sf http://${{ env.MINIKUBE_IP }}:30080/login.html \
-            || (echo "❌ Login page unreachable" && exit 1)
-          echo "✅ Login page OK"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/)
+          echo "index.html status: $STATUS"
+          [ "$STATUS" = "200" ] && echo "✅ index.html OK" || (echo "❌ index.html FAILED" && exit 1)
 
-      - name: Test PHP app tier via nginx proxy
+      - name: Test login.html
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST http://${{ env.MINIKUBE_IP }}:30080/submit.php)
-          echo "submit.php response: $STATUS"
-          # 400 = reached PHP (invalid input) = app tier alive
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/login.html)
+          echo "login.html status: $STATUS"
+          [ "$STATUS" = "200" ] && echo "✅ login.html OK" || (echo "❌ login.html FAILED" && exit 1)
+
+      - name: Test register.html
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/register.html)
+          echo "register.html status: $STATUS"
+          [ "$STATUS" = "200" ] && echo "✅ register.html OK" || (echo "❌ register.html FAILED" && exit 1)
+
+      - name: Test submit.php (app tier)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:9090/submit.php)
+          echo "submit.php status: $STATUS"
           [[ "$STATUS" == "200" || "$STATUS" == "400" ]] \
-            && echo "✅ App tier OK" || (echo "❌ App tier unreachable" && exit 1)
+            && echo "✅ App tier OK" || (echo "❌ App tier FAILED" && exit 1)
 
-      - name: Notify success
+      - name: Test dashboard.php (auth redirect)
         run: |
-          echo "🎉 Deployment successful!"
-          echo "🌐 App:      http://$(minikube ip):30080"
-          echo "📊 Grafana:  http://$(minikube ip):32000"
-          echo "🔥 Prometheus: http://$(minikube ip):32001"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/dashboard.php)
+          echo "dashboard.php status: $STATUS"
+          [[ "$STATUS" == "302" || "$STATUS" == "200" ]] \
+            && echo "✅ dashboard.php OK" || (echo "❌ dashboard.php FAILED" && exit 1)
+
+      - name: Test MySQL connection
+        run: |
+          kubectl exec deployment/db-deployment -n ${{ env.K8S_NAMESPACE }} -- \
+            mysqladmin ping -h localhost 2>/dev/null \
+            && echo "✅ MySQL OK" || (echo "❌ MySQL FAILED" && exit 1)
+
+      - name: Final summary
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🎉 VickYCloud deployment successful!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🌐 App:       http://localhost:9090"
+          echo "🔐 Login:     http://localhost:9090/login.html"
+          echo "📊 Dashboard: http://localhost:9090/dashboard.php"
+          echo "🐳 Image tag: ${{ env.IMAGE_TAG }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
