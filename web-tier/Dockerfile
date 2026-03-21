@@ -13,7 +13,8 @@ RUN rm -rf /usr/share/nginx/html/*
 # ── Copy static frontend files ────────────────────────────────
 COPY index.html   /usr/share/nginx/html/index.html
 COPY login.html    /usr/share/nginx/html/login.html
-COPY register.html /usr/share/nginx/html/register.html
+COPY register.html        /usr/share/nginx/html/register.html
+COPY forgot-password.html /usr/share/nginx/html/forgot-password.html
 
 # ── Copy nginx config ─────────────────────────────────────────
 COPY default.conf /etc/nginx/conf.d/default.conf
