@@ -811,12 +811,51 @@
 </footer>
 
 <script>
-  // Form submit feedback
+  // Form submit feedback — real POST to submit.php
   document.getElementById('contact-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    document.getElementById('success-msg').style.display = 'block';
-    this.reset();
-    setTimeout(() => document.getElementById('success-msg').style.display = 'none', 5000);
+    const form    = this;
+    const btn     = form.querySelector('.submit-btn');
+    const success = document.getElementById('success-msg');
+
+    // Show loading state
+    btn.disabled = true;
+    btn.querySelector('span').textContent = 'Sending...';
+    success.style.display = 'none';
+
+    fetch('/submit.php', {
+      method: 'POST',
+      body: new FormData(form)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      success.style.display = 'block';
+      if (data.success) {
+        success.style.color      = '#10b981';
+        success.style.borderColor = 'rgba(16,185,129,0.3)';
+        success.style.background  = 'rgba(16,185,129,0.1)';
+        success.textContent = '✅ ' + data.message;
+        form.reset();
+      } else {
+        success.style.color      = '#ef4444';
+        success.style.borderColor = 'rgba(239,68,68,0.3)';
+        success.style.background  = 'rgba(239,68,68,0.1)';
+        success.textContent = '❌ ' + data.message;
+      }
+      setTimeout(function() { success.style.display = 'none'; }, 6000);
+    })
+    .catch(function() {
+      success.style.display    = 'block';
+      success.style.color      = '#ef4444';
+      success.style.borderColor = 'rgba(239,68,68,0.3)';
+      success.style.background  = 'rgba(239,68,68,0.1)';
+      success.textContent = '❌ Connection error. Please try again.';
+      setTimeout(function() { success.style.display = 'none'; }, 6000);
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.querySelector('span').textContent = 'Submit Request →';
+    });
   });
 
   // Scroll reveal for cards

@@ -7,13 +7,14 @@
 
 session_start();
 
-define('DB_HOST', 'mysql-service');
-define('DB_USER', 'vickyuser');
-define('DB_PASS', 'password123');
-define('DB_NAME', 'devopsdb');
+// ── DB Connection — reads from Kubernetes env vars ─────────────
+$host = getenv('DB_HOST') ?: 'mysql-service';
+$user = getenv('DB_USER') ?: 'vickyuser';
+$pass = getenv('DB_PASS') ?: 'password123';
+$db   = getenv('DB_NAME') ?: 'devopsdb';
 
 // ── DB Connection ──────────────────────────────────────────────
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+$conn = new mysqli($host, $user, $pass, $db);
 if ($conn->connect_error) {
     respond(false, "Service temporarily unavailable. Please try again.");
     exit;
@@ -102,31 +103,7 @@ function sanitize(mysqli $conn, string $val): string {
 }
 
 function respond(bool $success, string $msg): void {
-    $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
-    if (str_contains($accept, 'application/json')) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => $success, 'message' => $msg]);
-        return;
-    }
+    header('Content-Type: application/json');
     http_response_code($success ? 200 : 400);
-    $icon  = $success ? '✅' : '❌';
-    $color = $success ? '#10b981' : '#ef4444';
-    echo "<!DOCTYPE html><html><head>
-        <meta charset='UTF-8'/>
-        <meta http-equiv='refresh' content='3;url=index.html'/>
-        <title>VickYCloud</title>
-        <style>
-            body{margin:0;display:flex;align-items:center;justify-content:center;
-                 min-height:100vh;background:#04060f;font-family:sans-serif;color:#e8edf8;}
-            .box{background:#0e1428;border:1px solid rgba(99,179,255,0.15);
-                 border-radius:16px;padding:40px 48px;text-align:center;max-width:420px;}
-            .icon{font-size:2.5rem;margin-bottom:14px;}
-            p{color:#7a8aaa;font-size:0.9rem;margin-top:10px;}
-            strong{color:{$color};font-size:1.05rem;}
-        </style></head><body>
-        <div class='box'>
-            <div class='icon'>{$icon}</div>
-            <strong>{$msg}</strong>
-            <p>Redirecting back in 3 seconds…</p>
-        </div></body></html>";
+    echo json_encode(['success' => $success, 'message' => $msg]);
 }
